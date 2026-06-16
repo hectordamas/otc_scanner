@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OTC Scanner Pro — IQ Option</title>
+  
+  <!-- Google Fonts: Outfit (modern sans-serif) & Fira Code (monospace for trading numbers) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Estilos del dashboard -->
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+
+  <!-- Dashboard Principal -->
+  <div class="app-container">
+    
+    <!-- Topbar / Cabecera -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="radar-pulse-icon"></div>
+        <h1>OTC<span>SCANNER</span></h1>
+        <span class="badge-pro">PRO</span>
+      </div>
+      
+      <div class="scanner-status-bar">
+        <div class="status-item">
+          <span class="label">ESTADO:</span>
+          <span id="conn-status" class="status-badge disconnected">DESCONECTADO</span>
+        </div>
+        
+        <div class="status-item divider"></div>
+        
+        <div class="status-item">
+          <span class="label">ÚLTIMO SCAN:</span>
+          <span id="last-scan-time" class="value">--:--:--</span>
+        </div>
+        
+        <div class="status-item divider"></div>
+        
+        <div class="status-item">
+          <span class="label">ACTIVOS:</span>
+          <span id="total-assets" class="value">0</span>
+        </div>
+        
+        <div class="status-item progress-container">
+          <div id="scan-progress-bar" class="progress-bar"></div>
+        </div>
+      </div>
+      
+      <div class="header-actions">
+        <button id="btn-refresh" class="btn btn-secondary" title="Escanear ahora">
+          <svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35Z"/></svg>
+          <span class="btn-text">ESCANEAR</span>
+        </button>
+        <button id="btn-toggle-settings" class="btn btn-primary" title="Configuración">
+          <svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94c0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6s3.6 1.62 3.6 3.6s-1.62 3.6-3.6 3.6z"/></svg>
+        </button>
+      </div>
+    </header>
+    
+    <!-- Contenido Principal (Split View) -->
+    <main class="dashboard-content">
+      
+      <!-- Panel de Activos (Columna Izquierda) -->
+      <section class="assets-panel">
+        <div class="panel-header">
+          <h2>LISTA DE ACTIVOS OTC</h2>
+          <div class="search-filter-row">
+            <input type="text" id="search-input" placeholder="Buscar par (ej: EURUSD)...">
+            <select id="filter-dir">
+              <option value="ALL">Todas las Direcciones</option>
+              <option value="UP">▲ Compras</option>
+              <option value="DOWN">▼ Ventas</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="assets-list-wrapper">
+          <!-- Categoría TOP -->
+          <div class="assets-group-section">
+            <div class="group-header text-glow-green">
+              <span>★ CATEGORÍA TOP</span>
+              <span id="count-top" class="badge">0</span>
+            </div>
+            <div id="list-top" class="pairs-grid">
+              <!-- Cargado dinámicamente -->
+              <div class="loading-placeholder">Esperando datos de conexión...</div>
+            </div>
+          </div>
+          
+          <!-- Categoría OPERABLES -->
+          <div class="assets-group-section">
+            <div class="group-header text-glow-blue">
+              <span>⚡ CATEGORÍA OPERABLES</span>
+              <span id="count-operables" class="badge">0</span>
+            </div>
+            <div id="list-operables" class="pairs-grid">
+              <!-- Cargado dinámicamente -->
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Panel de Detalle (Columna Derecha) -->
+      <section class="detail-panel" id="detail-panel">
+        <!-- Placeholder cuando no hay nada seleccionado -->
+        <div class="detail-placeholder" id="detail-placeholder">
+          <div class="radar-scan-animation">
+            <div class="radar-line"></div>
+          </div>
+          <h3>SELECCIONA UN ACTIVO</h3>
+          <p>Haz clic en cualquier par de la lista para cargar su análisis técnico, gráfico de velas y métricas de mercado en tiempo real.</p>
+        </div>
+        
+        <!-- Contenido del Detalle (Oculto inicialmente) -->
+        <div class="detail-data-container" id="detail-data" style="display: none;">
+          
+          <!-- Encabezado de Detalles -->
+          <div class="detail-header-row">
+            <div>
+              <h2 id="detail-pair-name">EURUSD-OTC</h2>
+              <div class="price-row">
+                <span class="label">PRECIO ACT:</span>
+                <span id="detail-pair-price" class="price-val">1.09243</span>
+              </div>
+            </div>
+            <div id="detail-dir-badge" class="dir-badge buy">
+              <span class="arrow">▲</span>
+              <span class="text">COMPRA</span>
+            </div>
+          </div>
+          
+          <!-- Gráfico de Velas SVG -->
+          <div class="chart-wrapper">
+            <div class="chart-header">
+              <span>Gráfico de Velas (Últimas 40 velas de 1m)</span>
+              <div class="chart-legend">
+                <span class="legend-item"><span class="color-dot ema5"></span>EMA 5</span>
+                <span class="legend-item"><span class="color-dot ema13"></span>EMA 13</span>
+                <span class="legend-item"><span class="color-dot sr"></span>S/R</span>
+              </div>
+            </div>
+            <div class="chart-container" id="svg-chart-container">
+              <!-- SVG inyectado por JS -->
+            </div>
+            <div class="chart-tooltip" id="chart-tooltip" style="display: none;"></div>
+          </div>
+          
+          <!-- Panel de Cuadrícula de Métricas -->
+          <div class="metrics-grid">
+            
+            <!-- Score de Calidad -->
+            <div class="metric-card score-card">
+              <div class="metric-info">
+                <span class="label">SCORE CALIDAD</span>
+                <span id="val-score" class="value monospace">85.4</span>
+              </div>
+              <div class="progress-bar-bg">
+                <div id="bar-score" class="progress-bar-fill score-color" style="width: 85%"></div>
+              </div>
+            </div>
+            
+            <!-- ADX -->
+            <div class="metric-card">
+              <div class="metric-info">
+                <span class="label">ADX TENDENCIA</span>
+                <span id="val-adx" class="value monospace">54.2</span>
+              </div>
+              <div class="progress-bar-bg">
+                <div id="bar-adx" class="progress-bar-fill green-color" style="width: 54%"></div>
+              </div>
+            </div>
+
+            <!-- R² (Linealidad) -->
+            <div class="metric-card">
+              <div class="metric-info">
+                <span class="label">COEFICIENTE R²</span>
+                <span id="val-r2" class="value monospace">0.890</span>
+              </div>
+              <div class="progress-bar-bg">
+                <div id="bar-r2" class="progress-bar-fill blue-color" style="width: 89%"></div>
+              </div>
+            </div>
+
+            <!-- Eficiencia -->
+            <div class="metric-card">
+              <div class="metric-info">
+                <span class="label">EFICIENCIA</span>
+                <span id="val-eff" class="value monospace">0.620</span>
+              </div>
+              <div class="progress-bar-bg">
+                <div id="bar-eff" class="progress-bar-fill cyan-color" style="width: 62%"></div>
+              </div>
+            </div>
+
+            <!-- Camino Libre (S/R) -->
+            <div class="metric-card">
+              <div class="metric-info">
+                <span class="label">CAMINO LIBRE</span>
+                <span id="val-space" class="value monospace">0.075%</span>
+              </div>
+              <div class="progress-bar-bg">
+                <div id="bar-space" class="progress-bar-fill purple-color" style="width: 75%"></div>
+              </div>
+              <div class="metric-subtext">
+                Obs: <span id="val-obstacle" class="monospace">1.09280</span>
+              </div>
+            </div>
+
+            <!-- Volatilidad ATR -->
+            <div class="metric-card">
+              <div class="metric-info">
+                <span class="label">ATR RELATIVO</span>
+                <span id="val-atr" class="value monospace">0.182%</span>
+              </div>
+              <div class="progress-bar-bg">
+                <div id="bar-atr" class="progress-bar-fill yellow-color" style="width: 60%"></div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Metadatos de Estructura y Fase -->
+          <div class="meta-section">
+            <div class="meta-item">
+              <span class="label">Fase Tendencia:</span>
+              <span id="val-phase" class="val-badge green">FRESCA</span>
+            </div>
+            <div class="meta-item">
+              <span class="label">Momentum ADX:</span>
+              <span id="val-momentum" class="val-badge">ACELERANDO</span>
+            </div>
+            <div class="meta-item">
+              <span class="label">Estructura Mkt:</span>
+              <span id="val-structure" class="val-badge">SALUDABLE</span>
+            </div>
+            <div class="meta-item">
+              <span class="label">Velas a Favor:</span>
+              <span id="val-cif" class="value monospace">7/10</span>
+            </div>
+          </div>
+
+          <!-- Avisos Técnicos -->
+          <div class="alerts-section">
+            <h3>AVISOS DE CONTEXTO</h3>
+            <div id="soft-notes-container" class="tags-container">
+              <!-- Tags inyectadas por JS -->
+            </div>
+          </div>
+          
+        </div>
+      </section>
+      
+    </main>
+    
+    <!-- Sidebar de Configuración (Oculto lateralmente) -->
+    <div class="settings-sidebar" id="settings-sidebar">
+      <div class="sidebar-header">
+        <h2>CONFIGURACIÓN</h2>
+        <button id="btn-close-settings" class="btn-close">
+          <svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12L19 6.41Z"/></svg>
+        </button>
+      </div>
+      
+      <div class="sidebar-body">
+        
+        <!-- Credenciales -->
+        <div class="settings-group">
+          <h3>CREDENCIALES IQ OPTION</h3>
+          <div id="login-inputs-container">
+            <div class="input-control">
+              <label for="input-email">Email:</label>
+              <input type="email" id="input-email" placeholder="ejemplo@correo.com">
+            </div>
+            <div class="input-control">
+              <label for="input-pass">Contraseña:</label>
+              <input type="password" id="input-pass" placeholder="••••••••••••">
+            </div>
+          </div>
+          <div id="logged-in-container" style="display: none; background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); padding: 12px; border-radius: 6px; margin-bottom: 12px;">
+            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">SESIÓN ACTIVA</p>
+            <p id="logged-email-text" class="monospace" style="font-size: 13px; font-weight: 700; color: var(--neon-green); word-break: break-all; margin-bottom: 12px;"></p>
+            <button id="btn-logout" class="btn btn-danger btn-block" style="width: 100%;">CERRAR SESIÓN</button>
+          </div>
+        </div>
+        
+        <!-- Conexión -->
+        <div class="settings-group">
+          <h3>MODO DE CONEXIÓN</h3>
+          <div class="radio-control-row">
+            <label class="radio-label">
+              <input type="radio" name="conn-mode" value="local" checked>
+              <span>Servidor Local (Recomendado)</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="conn-mode" value="cloud">
+              <span>Nube (Vercel Serverless)</span>
+            </label>
+          </div>
+          <div class="input-control" id="local-url-control">
+            <label for="input-backend-url">URL Servidor Local:</label>
+            <input type="text" id="input-backend-url" value="http://localhost:8000">
+          </div>
+          <p class="settings-help-text" id="help-text-mode">
+            El modo **Local** mantiene una conexión abierta continua y escanea en segundo plano sin cold starts ni bloqueos de IP.
+          </p>
+        </div>
+        
+        <!-- Parámetros del Scanner -->
+        <div class="settings-group">
+          <h3>UMBRALES DEL ESCÁNER</h3>
+          
+          <div class="slider-control">
+            <div class="slider-info">
+              <label for="slider-adx-min">ADX Mínimo (TOP):</label>
+              <span id="lbl-adx-min" class="monospace">50</span>
+            </div>
+            <input type="range" id="slider-adx-min" min="20" max="65" step="1" value="50">
+          </div>
+          
+          <div class="slider-control">
+            <div class="slider-info">
+              <label for="slider-adx-watch">ADX Mínimo (OPERABLES):</label>
+              <span id="lbl-adx-watch" class="monospace">40</span>
+            </div>
+            <input type="range" id="slider-adx-watch" min="15" max="50" step="1" value="40">
+          </div>
+
+          <div class="slider-control">
+            <div class="slider-info">
+              <label for="slider-r2-min">R² Mínimo (Linealidad):</label>
+              <span id="lbl-r2-min" class="monospace">0.84</span>
+            </div>
+            <input type="range" id="slider-r2-min" min="0.50" max="0.95" step="0.01" value="0.84">
+          </div>
+
+          <div class="slider-control">
+            <div class="slider-info">
+              <label for="slider-eff-min">Eficiencia Mínima:</label>
+              <span id="lbl-eff-min" class="monospace">0.54</span>
+            </div>
+            <input type="range" id="slider-eff-min" min="0.30" max="0.80" step="0.01" value="0.54">
+          </div>
+
+          <div class="slider-control">
+            <div class="slider-info">
+              <label for="slider-atr-max">Volatilidad ATR Máxima (%):</label>
+              <span id="lbl-atr-max" class="monospace">0.30</span>
+            </div>
+            <input type="range" id="slider-atr-max" min="0.10" max="0.60" step="0.01" value="0.30">
+          </div>
+
+          <label class="checkbox-label" style="margin-top: 14px;">
+            <input type="checkbox" id="check-strict-filter">
+            <span>Filtro Estricto (Ocultar si no cumple R²/Eficiencia/ATR)</span>
+          </label>
+        </div>
+
+        <!-- Alertas Sonoras -->
+        <div class="settings-group">
+          <h3>NOTIFICACIONES</h3>
+          <label class="checkbox-label">
+            <input type="checkbox" id="check-sound" checked>
+            <span>Alertas de Audio Sintetizado (Synth)</span>
+          </label>
+        </div>
+        
+        <button id="btn-save-settings" class="btn btn-primary btn-block">GUARDAR Y CONECTAR</button>
+      </div>
+    </div>
+    
+    <!-- Backdrop de Configuración -->
+    <div class="backdrop" id="backdrop"></div>
+  </div>
+
+  <script src="index.js"></script>
+</body>
+</html>

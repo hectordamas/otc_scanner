@@ -1,0 +1,20 @@
+Hice este proyecto con la intencion de que el programa identifique
+las tendencias con un contexto de momemtum hacia alguna direccion
+sin agotamiento, he visto que la herramiento cumple con la funcion
+de manera satisfactoria sin embargo me gustaria mejorarla que me de mejores
+contextos a la hora de operar, mi tipo de operativa es simple
+
+1. espero que se forma una pequeña acumulacion del precio en una tendencia 
+de gran momemtum
+
+2. apenas rompe la acumulacion (sin esperar cierre de vela), tomo la operacion
+esperando que la ruptura sea exitosa entre la vela que esta transcurriendo y la siguiente
+
+3. se gana la operacion a favor de la tendencia ya que la vela termina en un punto de ventaja
+desde donde inicia mi operacion
+
+en la carpeta example te dejo ejemplos del contexto y las zonas que yo tomo en cuenta para tomar 
+operacion y operaciones que he metido bajo la estrategia
+
+cabe destacar que esta herramienta no toma operaciones, solo me da una lista
+de activos donde cumple mi contexto ideal para tomar operativa
