@@ -483,10 +483,11 @@ def scan_single_pair(api, pair: str, s: dict) -> Optional[dict]:
         pass
     return None
 
-def execute_complete_scan(api, s: dict) -> dict:
+def execute_complete_scan(api, s: dict):
     pairs = get_otc_pairs_list(api)
     if not pairs:
-        return {"data": [], "missing_consts": []}
+        yield "results", [], [], 0
+        return
 
     results = []
     missing_consts = []
@@ -501,23 +502,12 @@ def execute_complete_scan(api, s: dict) -> dict:
 
     # Escaneo secuencial para evitar condiciones de carrera en el WebSocket de iqoptionapi
     total_valid = len(valid_pairs)
-    GLOBAL_STATE["scan_progress"] = 0
-    GLOBAL_STATE["scan_total"] = total_valid
     for idx, pair in enumerate(valid_pairs, 1):
-        GLOBAL_STATE["scan_active_pair"] = pair
-        GLOBAL_STATE["scan_index"] = idx
+        yield "progress", pair, idx, total_valid
         res = scan_single_pair(api, pair, s)
         if res:
             results.append(res)
-        # Actualizar progreso en porcentaje
-        GLOBAL_STATE["scan_progress"] = int((idx / total_valid) * 100)
         time.sleep(0.01)
-
-    # Resetear progreso
-    GLOBAL_STATE["scan_progress"] = 100
-    GLOBAL_STATE["scan_active_pair"] = ""
-    GLOBAL_STATE["scan_index"] = 0
-    GLOBAL_STATE["scan_total"] = 0
 
     # Filtrar y ordenar
     # otc_scanner.py filtra por: dirección válida y adx >= DISPLAY_ADX_MIN
@@ -530,11 +520,7 @@ def execute_complete_scan(api, s: dict) -> dict:
     # Ordenar por ADX descendente
     ordered = sorted(filtered, key=lambda x: x.get("adx", 0.0), reverse=True)
 
-    return {
-        "data": ordered,
-        "missing_consts": missing_consts,
-        "total_pairs": len(pairs)
-    }
+    yield "results", ordered, missing_consts, len(pairs)
 
 
 # ─── Bucle en Segundo Plano para Modo Local ───────────────────────────────────
@@ -546,11 +532,19 @@ def local_background_scan_loop():
         GLOBAL_STATE["scan_progress"] = 0
         try:
             print(f"Escaneando activos al iniciar: {datetime.now().strftime('%H:%M:%S')}...")
-            scan_res = execute_complete_scan(GLOBAL_STATE["api"], GLOBAL_STATE["settings"])
+            for event_type, *args in execute_complete_scan(GLOBAL_STATE["api"], GLOBAL_STATE["settings"]):
+                if event_type == "progress":
+                    pair, idx, total = args
+                    GLOBAL_STATE["scan_active_pair"] = pair
+                    GLOBAL_STATE["scan_index"] = idx
+                    GLOBAL_STATE["scan_total"] = total
+                    GLOBAL_STATE["scan_progress"] = int((idx / total) * 100)
+                elif event_type == "results":
+                    ordered, missing_consts, total_pairs = args
+                    GLOBAL_STATE["latest_results"] = ordered
+                    GLOBAL_STATE["missing_consts"] = missing_consts
+                    GLOBAL_STATE["pairs_scanned"] = total_pairs
             
-            GLOBAL_STATE["latest_results"] = scan_res["data"]
-            GLOBAL_STATE["missing_consts"] = scan_res["missing_consts"]
-            GLOBAL_STATE["pairs_scanned"] = scan_res["total_pairs"]
             GLOBAL_STATE["last_scan_time"] = datetime.now().strftime("%H:%M:%S")
             GLOBAL_STATE["conn_error"] = ""
         except Exception as e:
@@ -559,6 +553,9 @@ def local_background_scan_loop():
         finally:
             GLOBAL_STATE["is_scanning"] = False
             GLOBAL_STATE["scan_progress"] = 0
+            GLOBAL_STATE["scan_active_pair"] = ""
+            GLOBAL_STATE["scan_index"] = 0
+            GLOBAL_STATE["scan_total"] = 0
 
 # ─── Endpoints API ────────────────────────────────────────────────────────────
 
@@ -599,10 +596,18 @@ def login(req: LoginRequest, background_tasks: BackgroundTasks):
             def init_scan():
                 GLOBAL_STATE["is_scanning"] = True
                 try:
-                    scan_res = execute_complete_scan(api, GLOBAL_STATE["settings"])
-                    GLOBAL_STATE["latest_results"] = scan_res["data"]
-                    GLOBAL_STATE["missing_consts"] = scan_res["missing_consts"]
-                    GLOBAL_STATE["pairs_scanned"] = scan_res["total_pairs"]
+                    for event_type, *args in execute_complete_scan(api, GLOBAL_STATE["settings"]):
+                        if event_type == "progress":
+                            pair, idx, total = args
+                            GLOBAL_STATE["scan_active_pair"] = pair
+                            GLOBAL_STATE["scan_index"] = idx
+                            GLOBAL_STATE["scan_total"] = total
+                            GLOBAL_STATE["scan_progress"] = int((idx / total) * 100)
+                        elif event_type == "results":
+                            ordered, missing_consts, total_pairs = args
+                            GLOBAL_STATE["latest_results"] = ordered
+                            GLOBAL_STATE["missing_consts"] = missing_consts
+                            GLOBAL_STATE["pairs_scanned"] = total_pairs
                     GLOBAL_STATE["last_scan_time"] = datetime.now().strftime("%H:%M:%S")
                 except Exception as e:
                     GLOBAL_STATE["conn_error"] = str(e)
@@ -700,10 +705,18 @@ def scan_now(background_tasks: BackgroundTasks):
         GLOBAL_STATE["is_scanning"] = True
         try:
             print("Escaneo manual iniciado...")
-            scan_res = execute_complete_scan(GLOBAL_STATE["api"], GLOBAL_STATE["settings"])
-            GLOBAL_STATE["latest_results"] = scan_res["data"]
-            GLOBAL_STATE["missing_consts"] = scan_res["missing_consts"]
-            GLOBAL_STATE["pairs_scanned"] = scan_res["total_pairs"]
+            for event_type, *args in execute_complete_scan(GLOBAL_STATE["api"], GLOBAL_STATE["settings"]):
+                if event_type == "progress":
+                    pair, idx, total = args
+                    GLOBAL_STATE["scan_active_pair"] = pair
+                    GLOBAL_STATE["scan_index"] = idx
+                    GLOBAL_STATE["scan_total"] = total
+                    GLOBAL_STATE["scan_progress"] = int((idx / total) * 100)
+                elif event_type == "results":
+                    ordered, missing_consts, total_pairs = args
+                    GLOBAL_STATE["latest_results"] = ordered
+                    GLOBAL_STATE["missing_consts"] = missing_consts
+                    GLOBAL_STATE["pairs_scanned"] = total_pairs
             GLOBAL_STATE["last_scan_time"] = datetime.now().strftime("%H:%M:%S")
             GLOBAL_STATE["conn_error"] = ""
         except Exception as e:
@@ -711,6 +724,9 @@ def scan_now(background_tasks: BackgroundTasks):
             GLOBAL_STATE["conn_error"] = str(e)
         finally:
             GLOBAL_STATE["is_scanning"] = False
+            GLOBAL_STATE["scan_active_pair"] = ""
+            GLOBAL_STATE["scan_index"] = 0
+            GLOBAL_STATE["scan_total"] = 0
             
     background_tasks.add_task(manual_scan_task)
     return {"success": True, "message": "Escaneo forzado iniciado."}
@@ -722,35 +738,41 @@ def get_instant_scan(
 ):
     """
     Endpoint para Vercel Cloud Serverless (Modo Nube).
-    Realiza una conexión de un solo uso, escanea y retorna los datos de inmediato.
+    Realiza una conexión de un solo uso, escanea y transmite los datos en tiempo real mediante SSE.
     """
-    # Si no se pasan credenciales por parámetro, intentar usar las almacenadas
     use_email = email or GLOBAL_STATE["email"]
     use_pass = password or GLOBAL_STATE["password"]
 
     if not use_email or not use_pass:
         raise HTTPException(status_code=400, detail="Credenciales no proporcionadas.")
 
-    try:
-        print(f"Modo nube: Escaneando bajo demanda para {use_email}...")
-        # Para Vercel (nube), creamos conexión rápida, escaneamos y desconectamos
-        api = connect_iq(use_email, use_pass)
+    from fastapi.responses import StreamingResponse
+    import json
+
+    def event_stream():
+        api = None
         try:
-            scan_res = execute_complete_scan(api, GLOBAL_STATE["settings"])
-            return {
-                "success": True,
-                "timestamp": datetime.now().strftime("%H:%M:%S"),
-                "pairs_scanned": scan_res["total_pairs"],
-                "missing_consts": scan_res["missing_consts"],
-                "data": scan_res["data"]
-            }
+            print(f"Modo nube: Escaneando bajo demanda para {use_email}...")
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Conectando a IQ Option...'})}\n\n"
+            api = connect_iq(use_email, use_pass)
+            
+            for event_type, *args in execute_complete_scan(api, GLOBAL_STATE["settings"]):
+                if event_type == "progress":
+                    pair, idx, total = args
+                    yield f"data: {json.dumps({'type': 'progress', 'active_pair': pair, 'index': idx, 'total': total})}\n\n"
+                elif event_type == "results":
+                    ordered, missing_consts, total_pairs = args
+                    yield f"data: {json.dumps({'type': 'results', 'data': ordered, 'missing_consts': missing_consts, 'pairs_scanned': total_pairs})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
         finally:
-            try:
-                api.disconnect()
-            except Exception:
-                pass
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error en escaneo en nube: {str(e)}")
+            if api:
+                try:
+                    api.disconnect()
+                except Exception:
+                    pass
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 # ─── Servir Frontend Estático en Local ────────────────────────────────────────
 

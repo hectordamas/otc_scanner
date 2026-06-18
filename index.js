@@ -430,16 +430,8 @@ async function runCloudScan() {
   }
   
   state.isScanning = true;
-  updateStatusUI("scanning", "ESCANEANDO NUBE...");
-  
-  // Barra de progreso animada simulada
-  let progress = 10;
-  const progressInterval = setInterval(() => {
-    if (progress < 90) {
-      progress += 10;
-      document.getElementById("scan-progress-bar").style.width = `${progress}%`;
-    }
-  }, 400);
+  updateStatusUI("scanning", "CONECTANDO...");
+  document.getElementById("scan-progress-bar").style.width = "5%";
 
   try {
     const url = getApiUrl(`/api/scan?email=${encodeURIComponent(state.email)}&password=${encodeURIComponent(state.password)}`);
@@ -449,27 +441,59 @@ async function runCloudScan() {
       throw new Error(`Fallo del servidor: ${response.statusText}`);
     }
     
-    const data = await response.json();
-    clearInterval(progressInterval);
-    document.getElementById("scan-progress-bar").style.width = "100%";
-    
-    if (data.success) {
-      state.lastScanTime = data.timestamp;
-      state.allPairs = data.data || [];
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
       
-      document.getElementById("last-scan-time").textContent = state.lastScanTime;
-      document.getElementById("total-assets").textContent = data.pairs_scanned || 0;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n\n");
       
-      updateStatusUI("connected", "CONECTADO");
-      filterAndRenderPairs();
-      playSynthChime("scan_done");
-    } else {
-      updateStatusUI("error", "ERROR SCAN");
-      alert(`Error en escaneo: ${data.message}`);
+      // Keep the last partial line in the buffer
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (line.trim().startsWith("data:")) {
+          const jsonStr = line.replace(/^data:\s*/, "").trim();
+          if (!jsonStr) continue;
+          try {
+            const event = JSON.parse(jsonStr);
+            if (event.type === "status") {
+              updateStatusUI("scanning", event.message.toUpperCase());
+            } else if (event.type === "progress") {
+              const activePair = event.active_pair ? event.active_pair.replace("-OTC", "") : "";
+              const idx = event.index;
+              const total = event.total;
+              const prog = Math.round((idx / total) * 100);
+              
+              updateStatusUI("scanning", `ESCANEANDO: ${activePair} ${idx}/${total} (${prog}%)`);
+              document.getElementById("scan-progress-bar").style.width = `${prog}%`;
+            } else if (event.type === "results") {
+              document.getElementById("scan-progress-bar").style.width = "100%";
+              
+              state.lastScanTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+              state.allPairs = event.data || [];
+              
+              document.getElementById("last-scan-time").textContent = state.lastScanTime;
+              document.getElementById("total-assets").textContent = event.pairs_scanned || 0;
+              
+              updateStatusUI("connected", "CONECTADO");
+              filterAndRenderPairs();
+              playSynthChime("scan_done");
+            } else if (event.type === "error") {
+              throw new Error(event.message);
+            }
+          } catch (e) {
+            console.error("Error parseando evento SSE:", e);
+          }
+        }
+      }
     }
   } catch (err) {
     console.error(err);
-    clearInterval(progressInterval);
     updateStatusUI("error", "ERROR CONEXIÓN");
     alert(`Error al contactar con la nube: ${err.message}`);
   } finally {
