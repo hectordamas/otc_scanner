@@ -727,6 +727,37 @@ body {
 .color-dot.ema13 { background-color: var(--neon-amber); }
 .color-dot.sr { border-radius: 0; width: 10px; height: 1px; background-color: var(--neon-purple); }
 
+.chart-hud {
+  display: flex;
+  gap: 16px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  padding: 0 4px;
+}
+
+.chart-hud .hud-item {
+  display: flex;
+  gap: 4px;
+}
+
+.chart-hud .hud-item span {
+  font-weight: 700;
+  color: var(--text-main);
+  transition: color 0.15s ease;
+}
+
+.chart-hud .hud-item span.up {
+  color: var(--neon-green);
+  text-shadow: 0 0 5px rgba(16, 185, 129, 0.2);
+}
+
+.chart-hud .hud-item span.down {
+  color: var(--neon-red);
+  text-shadow: 0 0 5px rgba(244, 63, 94, 0.2);
+}
+
 .chart-container {
   height: 220px;
   width: 100%;

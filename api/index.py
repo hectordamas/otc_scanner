@@ -70,6 +70,9 @@ GLOBAL_STATE = {
     "missing_consts": [],
     "is_scanning": False,
     "scan_progress": 0, # Progreso en porcentaje (0-100)
+    "scan_active_pair": "", # Par que se está escaneando actualmente
+    "scan_index": 0, # Índice actual escaneado
+    "scan_total": 0, # Total de pares a escanear
     "bg_loop_active": False,
 }
 
@@ -499,7 +502,10 @@ def execute_complete_scan(api, s: dict) -> dict:
     # Escaneo secuencial para evitar condiciones de carrera en el WebSocket de iqoptionapi
     total_valid = len(valid_pairs)
     GLOBAL_STATE["scan_progress"] = 0
+    GLOBAL_STATE["scan_total"] = total_valid
     for idx, pair in enumerate(valid_pairs, 1):
+        GLOBAL_STATE["scan_active_pair"] = pair
+        GLOBAL_STATE["scan_index"] = idx
         res = scan_single_pair(api, pair, s)
         if res:
             results.append(res)
@@ -509,6 +515,9 @@ def execute_complete_scan(api, s: dict) -> dict:
 
     # Resetear progreso
     GLOBAL_STATE["scan_progress"] = 100
+    GLOBAL_STATE["scan_active_pair"] = ""
+    GLOBAL_STATE["scan_index"] = 0
+    GLOBAL_STATE["scan_total"] = 0
 
     # Filtrar y ordenar
     # otc_scanner.py filtra por: dirección válida y adx >= DISPLAY_ADX_MIN
@@ -657,6 +666,9 @@ def get_status():
         "conn_error": GLOBAL_STATE["conn_error"],
         "is_scanning": GLOBAL_STATE["is_scanning"],
         "scan_progress": GLOBAL_STATE["scan_progress"],
+        "scan_active_pair": GLOBAL_STATE["scan_active_pair"],
+        "scan_index": GLOBAL_STATE["scan_index"],
+        "scan_total": GLOBAL_STATE["scan_total"],
         "last_scan_time": GLOBAL_STATE["last_scan_time"],
         "pairs_scanned": GLOBAL_STATE["pairs_scanned"],
         "bg_loop_active": GLOBAL_STATE["bg_loop_active"],

@@ -21,6 +21,16 @@ const state = {
   }
 };
 
+let pollIntervalId = null;
+let currentPollSpeed = null;
+
+function startPolling(ms) {
+  if (pollIntervalId && currentPollSpeed === ms) return;
+  if (pollIntervalId) clearInterval(pollIntervalId);
+  currentPollSpeed = ms;
+  pollIntervalId = setInterval(pollLocalScanStatus, ms);
+}
+
 // ─── Inicialización al Cargar la Página ─────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
   loadSavedConfig();
@@ -31,7 +41,7 @@ document.addEventListener("DOMContentLoaded", () => {
   checkInitialConnection();
 
   // Configurar bucle de recarga en local (polling)
-  setInterval(pollLocalScanStatus, 5000);
+  startPolling(5000);
 });
 
 async function checkInitialConnection() {
@@ -344,12 +354,24 @@ async function pollLocalScanStatus() {
     if (!statusData.is_connected) {
       updateStatusUI("error", "DESCONECTADO API");
       state.isConnected = false;
+      startPolling(5000); // Volver a polling normal si se desconecta
       return;
     }
 
     if (statusData.is_scanning) {
+      startPolling(800); // Polling rápido durante el escaneo
+      
       const prog = statusData.scan_progress || 0;
-      updateStatusUI("scanning", `ESCANEANDO (${prog}%)`);
+      const activePair = statusData.scan_active_pair ? statusData.scan_active_pair.replace("-OTC", "") : "";
+      const idx = statusData.scan_index || 0;
+      const total = statusData.scan_total || 0;
+      
+      let statusText = `ESCANEANDO (${prog}%)`;
+      if (activePair && idx && total) {
+        statusText = `ESCANEANDO: ${activePair} ${idx}/${total} (${prog}%)`;
+      }
+      
+      updateStatusUI("scanning", statusText);
       document.getElementById("scan-progress-bar").style.width = `${prog}%`;
       if (state.allPairs.length === 0) {
         document.querySelectorAll(".loading-placeholder").forEach(el => {
@@ -357,6 +379,7 @@ async function pollLocalScanStatus() {
         });
       }
     } else {
+      startPolling(5000); // Polling normal
       updateStatusUI("connected", "CONECTADO");
       document.getElementById("scan-progress-bar").style.width = "0%";
     }
@@ -617,7 +640,7 @@ function renderDetailPanel(p) {
   struct.textContent = p.structure ? "SALUDABLE" : "DEBIL";
   struct.className = `val-badge ${p.structure ? "green" : ""}`;
 
-  document.getElementById("val-cif").textContent = `${p.cif}/${state.settings.adx_momentum_lookback * 2}`;
+  document.getElementById("val-cif").textContent = `${p.cif}/${(state.settings.adx_momentum_lookback || 5) * 2}`;
 
   // Soft notes
   const notesContainer = document.getElementById("soft-notes-container");
@@ -668,6 +691,12 @@ function drawSvgChart(p) {
   const width = container.clientWidth;
   const height = container.clientHeight;
 
+  // Márgenes del gráfico para dejar espacio a los ejes
+  const marginLeft = 10;
+  const marginRight = 60;
+  const marginTop = 15;
+  const marginBottom = 20;
+
   // Encontrar valores min y max para escalar el eje Y
   const highs = candles.map(c => c.h);
   const lows = candles.map(c => c.l);
@@ -691,44 +720,119 @@ function drawSvgChart(p) {
   svg.setAttribute("width", "100%");
   svg.setAttribute("height", "100%");
 
-  // Función de mapeo de coordenadas
-  const getX = (index) => (index / (candles.length - 1)) * (width - 40) + 20;
-  const getY = (price) => height - ((price - yMin) / (yMax - yMin)) * (height - 30) - 15;
+  // Gradiente de fondo para el área del gráfico
+  const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+  const grad = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
+  grad.setAttribute("id", "chart-bg-grad");
+  grad.setAttribute("x1", "0");
+  grad.setAttribute("y1", "0");
+  grad.setAttribute("x2", "0");
+  grad.setAttribute("y2", "1");
+  
+  const stop1 = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+  stop1.setAttribute("offset", "0%");
+  stop1.setAttribute("stop-color", "rgba(11, 15, 26, 0.4)");
+  
+  const stop2 = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+  stop2.setAttribute("offset", "100%");
+  stop2.setAttribute("stop-color", "rgba(6, 9, 19, 0.8)");
+  
+  grad.appendChild(stop1);
+  grad.appendChild(stop2);
+  defs.appendChild(grad);
+  svg.appendChild(defs);
 
-  // 1. Dibujar cuadricula horizontal sutil
+  // Función de mapeo de coordenadas
+  const getX = (index) => (index / (candles.length - 1)) * (width - marginLeft - marginRight) + marginLeft;
+  const getY = (price) => height - ((price - yMin) / (yMax - yMin)) * (height - marginTop - marginBottom) - marginBottom;
+
+  // Dibujar fondo y marco del gráfico
+  const bgRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+  bgRect.setAttribute("x", marginLeft);
+  bgRect.setAttribute("y", marginTop);
+  bgRect.setAttribute("width", width - marginLeft - marginRight);
+  bgRect.setAttribute("height", height - marginTop - marginBottom);
+  bgRect.setAttribute("fill", "url(#chart-bg-grad)");
+  bgRect.setAttribute("stroke", "var(--border-color)");
+  bgRect.setAttribute("stroke-width", "1");
+  svg.appendChild(bgRect);
+
+  // 1. Dibujar cuadricula horizontal sutil y etiquetas de precio
   const gridLines = 4;
   for (let i = 0; i <= gridLines; i++) {
     const val = yMin + (i / gridLines) * (yMax - yMin);
     const y = getY(val);
     
+    // Línea horizontal
     const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    line.setAttribute("x1", "10");
+    line.setAttribute("x1", marginLeft);
     line.setAttribute("y1", y);
-    line.setAttribute("x2", width - 10);
+    line.setAttribute("x2", width - marginRight);
     line.setAttribute("y2", y);
-    line.setAttribute("stroke", "rgba(30, 41, 73, 0.3)");
-    line.setAttribute("stroke-width", "1");
+    line.setAttribute("stroke", "rgba(30, 41, 73, 0.4)");
+    line.setAttribute("stroke-width", "0.8");
+    line.setAttribute("stroke-dasharray", "2 2");
     svg.appendChild(line);
+    
+    // Etiqueta del precio en el eje Y (derecha)
+    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("x", width - marginRight + 5);
+    text.setAttribute("y", y + 3);
+    text.setAttribute("fill", "var(--text-muted)");
+    text.setAttribute("font-size", "9px");
+    text.setAttribute("font-family", "var(--font-mono)");
+    text.textContent = val.toFixed(5);
+    svg.appendChild(text);
+  }
+
+  // 1.5 Dibujar cuadricula vertical y marcas de tiempo en el eje X (abajo)
+  const numTimeLabels = 4;
+  const indexStep = Math.floor(candles.length / numTimeLabels);
+  for (let i = 0; i < numTimeLabels; i++) {
+    const idx = Math.min(i * indexStep + Math.floor(indexStep / 2), candles.length - 1);
+    const x = getX(idx);
+    const candle = candles[idx];
+    
+    // Línea vertical
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", x);
+    line.setAttribute("y1", marginTop);
+    line.setAttribute("x2", x);
+    line.setAttribute("y2", height - marginBottom);
+    line.setAttribute("stroke", "rgba(30, 41, 73, 0.4)");
+    line.setAttribute("stroke-width", "0.8");
+    line.setAttribute("stroke-dasharray", "2 2");
+    svg.appendChild(line);
+    
+    // Etiqueta del tiempo en el eje X
+    const timeStr = new Date(candle.t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("x", x);
+    text.setAttribute("y", height - 5);
+    text.setAttribute("fill", "var(--text-muted)");
+    text.setAttribute("font-size", "9px");
+    text.setAttribute("font-family", "var(--font-mono)");
+    text.setAttribute("text-anchor", "middle");
+    text.textContent = timeStr;
+    svg.appendChild(text);
   }
 
   // 2. Dibujar línea de obstáculo S/R si existe
   if (p.obstacle !== null && p.obstacle >= yMin && p.obstacle <= yMax) {
     const obstacleY = getY(p.obstacle);
     
-    // Línea discontinua
     const srLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    srLine.setAttribute("x1", "10");
+    srLine.setAttribute("x1", marginLeft);
     srLine.setAttribute("y1", obstacleY);
-    srLine.setAttribute("x2", width - 10);
+    srLine.setAttribute("x2", width - marginRight);
     srLine.setAttribute("y2", obstacleY);
     srLine.setAttribute("stroke", "var(--neon-purple)");
     srLine.setAttribute("stroke-width", "1.5");
     srLine.setAttribute("stroke-dasharray", "4 4");
     svg.appendChild(srLine);
 
-    // Texto indicador de obstáculo
     const srText = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    srText.setAttribute("x", width - 50);
+    srText.setAttribute("x", width - marginRight - 60);
     srText.setAttribute("y", obstacleY - 4);
     srText.setAttribute("fill", "var(--neon-purple)");
     srText.setAttribute("font-size", "10px");
@@ -738,7 +842,8 @@ function drawSvgChart(p) {
   }
 
   // 3. Dibujar velas japonesas (wicks y bodies)
-  const candleWidth = Math.max(2, (width / candles.length) * 0.6);
+  const chartWidth = width - marginLeft - marginRight;
+  const candleWidth = Math.max(2, (chartWidth / candles.length) * 0.7);
 
   candles.forEach((c, i) => {
     const x = getX(i);
@@ -749,9 +854,8 @@ function drawSvgChart(p) {
     
     const isBullish = c.c >= c.o;
     const color = isBullish ? "var(--neon-green)" : "var(--neon-red)";
-    const shadowColor = isBullish ? "rgba(16, 185, 129, 0.25)" : "rgba(244, 63, 94, 0.25)";
 
-    // Wick (sombra superior e inferior)
+    // Wick (sombra)
     const wick = document.createElementNS("http://www.w3.org/2000/svg", "line");
     wick.setAttribute("x1", x);
     wick.setAttribute("y1", yHigh);
@@ -761,24 +865,18 @@ function drawSvgChart(p) {
     wick.setAttribute("stroke-width", "1.2");
     svg.appendChild(wick);
 
-    // Body (cuerpo de la vela)
+    // Body (cuerpo relleno sólido al estilo broker)
     const body = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-    const rHeight = Math.max(1, Math.abs(yClose - yOpen));
+    const rHeight = Math.max(1.5, Math.abs(yClose - yOpen));
     const rY = Math.min(yOpen, yClose);
 
     body.setAttribute("x", x - candleWidth / 2);
     body.setAttribute("y", rY);
     body.setAttribute("width", candleWidth);
     body.setAttribute("height", rHeight);
-    body.setAttribute("fill", isBullish ? "rgba(16, 185, 129, 0.15)" : "rgba(244, 63, 94, 0.15)");
+    body.setAttribute("fill", color);
     body.setAttribute("stroke", color);
-    body.setAttribute("stroke-width", "1.2");
-    body.style.filter = `drop-shadow(0 0 2px ${shadowColor})`;
-    
-    // Datos interactivos para hover en las velas
-    body.addEventListener("mouseenter", (e) => showChartTooltip(e, c, i, getX(i), Math.min(yOpen, yClose)));
-    body.addEventListener("mouseleave", hideChartTooltip);
-
+    body.setAttribute("stroke-width", "0.5");
     svg.appendChild(body);
   });
 
@@ -803,8 +901,203 @@ function drawSvgChart(p) {
   if (ema5.length > 0) drawEmaPath(ema5, "var(--neon-green)");
   if (ema13.length > 0) drawEmaPath(ema13, "var(--neon-amber)");
 
+  // 5. Dibujar línea de precio actual de la última vela
+  const lastCandle = candles[candles.length - 1];
+  const currentPrice = lastCandle.c;
+  const currentPriceY = getY(currentPrice);
+  const currentPriceColor = lastCandle.c >= lastCandle.o ? "var(--neon-green)" : "var(--neon-red)";
+
+  const currentPriceLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  currentPriceLine.setAttribute("x1", marginLeft);
+  currentPriceLine.setAttribute("y1", currentPriceY);
+  currentPriceLine.setAttribute("x2", width - marginRight);
+  currentPriceLine.setAttribute("y2", currentPriceY);
+  currentPriceLine.setAttribute("stroke", currentPriceColor);
+  currentPriceLine.setAttribute("stroke-width", "1");
+  currentPriceLine.setAttribute("stroke-dasharray", "3 3");
+  svg.appendChild(currentPriceLine);
+
+  // Etiqueta del precio actual en el eje Y
+  const priceBadgeGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  
+  const priceBadgeRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+  priceBadgeRect.setAttribute("x", width - marginRight + 2);
+  priceBadgeRect.setAttribute("y", currentPriceY - 7);
+  priceBadgeRect.setAttribute("width", marginRight - 4);
+  priceBadgeRect.setAttribute("height", 14);
+  priceBadgeRect.setAttribute("rx", 3);
+  priceBadgeRect.setAttribute("fill", currentPriceColor);
+  priceBadgeGroup.appendChild(priceBadgeRect);
+
+  const priceBadgeText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  priceBadgeText.setAttribute("x", width - marginRight + (marginRight / 2));
+  priceBadgeText.setAttribute("y", currentPriceY + 4);
+  priceBadgeText.setAttribute("fill", "var(--bg-main)");
+  priceBadgeText.setAttribute("font-size", "9px");
+  priceBadgeText.setAttribute("font-family", "var(--font-mono)");
+  priceBadgeText.setAttribute("font-weight", "700");
+  priceBadgeText.setAttribute("text-anchor", "middle");
+  priceBadgeText.textContent = currentPrice.toFixed(5);
+  priceBadgeGroup.appendChild(priceBadgeText);
+  svg.appendChild(priceBadgeGroup);
+
+  // 6. Configurar Crosshair interactivo
+  const crosshairV = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  crosshairV.setAttribute("stroke", "rgba(255, 255, 255, 0.4)");
+  crosshairV.setAttribute("stroke-width", "0.8");
+  crosshairV.setAttribute("stroke-dasharray", "3 3");
+  crosshairV.style.pointerEvents = "none";
+  crosshairV.style.display = "none";
+  svg.appendChild(crosshairV);
+
+  const crosshairH = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  crosshairH.setAttribute("stroke", "rgba(255, 255, 255, 0.4)");
+  crosshairH.setAttribute("stroke-width", "0.8");
+  crosshairH.setAttribute("stroke-dasharray", "3 3");
+  crosshairH.style.pointerEvents = "none";
+  crosshairH.style.display = "none";
+  svg.appendChild(crosshairH);
+
+  // Grupos para etiquetas dinámicas de ejes del crosshair
+  const crosshairYLabel = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  crosshairYLabel.style.pointerEvents = "none";
+  crosshairYLabel.style.display = "none";
+  svg.appendChild(crosshairYLabel);
+
+  const crosshairXLabel = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  crosshairXLabel.style.pointerEvents = "none";
+  crosshairXLabel.style.display = "none";
+  svg.appendChild(crosshairXLabel);
+
+  // Rectángulo invisible para capturar eventos de ratón
+  const overlay = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+  overlay.setAttribute("x", marginLeft);
+  overlay.setAttribute("y", marginTop);
+  overlay.setAttribute("width", width - marginLeft - marginRight);
+  overlay.setAttribute("height", height - marginTop - marginBottom);
+  overlay.setAttribute("fill", "transparent");
+  overlay.style.cursor = "crosshair";
+  svg.appendChild(overlay);
+
+  // Inicializar HUD con la última vela
+  updateHUD(lastCandle);
+
+  overlay.addEventListener("mousemove", (e) => {
+    const rect = svg.getBoundingClientRect();
+    const mouseX = (e.clientX - rect.left) * (width / rect.width);
+    const mouseY = (e.clientY - rect.top) * (height / rect.height);
+
+    let index = Math.round(((mouseX - marginLeft) / chartWidth) * (candles.length - 1));
+    index = Math.max(0, Math.min(candles.length - 1, index));
+
+    const snappedX = getX(index);
+    const candle = candles[index];
+
+    // Mostrar líneas
+    crosshairV.setAttribute("x1", snappedX);
+    crosshairV.setAttribute("y1", marginTop);
+    crosshairV.setAttribute("x2", snappedX);
+    crosshairV.setAttribute("y2", height - marginBottom);
+    crosshairV.style.display = "block";
+
+    crosshairH.setAttribute("x1", marginLeft);
+    crosshairH.setAttribute("y1", mouseY);
+    crosshairH.setAttribute("x2", width - marginRight);
+    crosshairH.setAttribute("y2", mouseY);
+    crosshairH.style.display = "block";
+
+    // Actualizar etiqueta del eje Y (precio)
+    const priceVal = yMin + ((height - mouseY - marginBottom) / (height - marginTop - marginBottom)) * (yMax - yMin);
+    crosshairYLabel.innerHTML = "";
+    
+    const yRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    yRect.setAttribute("x", width - marginRight + 2);
+    yRect.setAttribute("y", mouseY - 7);
+    yRect.setAttribute("width", marginRight - 4);
+    yRect.setAttribute("height", 14);
+    yRect.setAttribute("rx", 3);
+    yRect.setAttribute("fill", "var(--neon-cyan)");
+    crosshairYLabel.appendChild(yRect);
+    
+    const yText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    yText.setAttribute("x", width - marginRight + (marginRight / 2));
+    yText.setAttribute("y", mouseY + 4);
+    yText.setAttribute("fill", "var(--bg-main)");
+    yText.setAttribute("font-size", "9px");
+    yText.setAttribute("font-family", "var(--font-mono)");
+    yText.setAttribute("font-weight", "700");
+    yText.setAttribute("text-anchor", "middle");
+    yText.textContent = priceVal.toFixed(5);
+    crosshairYLabel.appendChild(yText);
+    crosshairYLabel.style.display = "block";
+
+    // Actualizar etiqueta del eje X (tiempo)
+    crosshairXLabel.innerHTML = "";
+    
+    const xRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    xRect.setAttribute("x", snappedX - 25);
+    xRect.setAttribute("y", height - marginBottom + 2);
+    xRect.setAttribute("width", 50);
+    xRect.setAttribute("height", 14);
+    xRect.setAttribute("rx", 3);
+    xRect.setAttribute("fill", "var(--neon-cyan)");
+    crosshairXLabel.appendChild(xRect);
+    
+    const timeStr = new Date(candle.t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const xText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    xText.setAttribute("x", snappedX);
+    xText.setAttribute("y", height - marginBottom + 12);
+    xText.setAttribute("fill", "var(--bg-main)");
+    xText.setAttribute("font-size", "9px");
+    xText.setAttribute("font-family", "var(--font-mono)");
+    xText.setAttribute("font-weight", "700");
+    xText.setAttribute("text-anchor", "middle");
+    xText.textContent = timeStr;
+    crosshairXLabel.appendChild(xText);
+    crosshairXLabel.style.display = "block";
+
+    // Actualizar HUD
+    updateHUD(candle);
+  });
+
+  overlay.addEventListener("mouseleave", () => {
+    crosshairV.style.display = "none";
+    crosshairH.style.display = "none";
+    crosshairYLabel.style.display = "none";
+    crosshairXLabel.style.display = "none";
+    
+    // Resetear HUD a la última vela
+    updateHUD(lastCandle);
+  });
+
   container.appendChild(svg);
 }
+
+// Actualiza el HUD del panel del gráfico con los valores OHLC de la vela actual
+function updateHUD(candle) {
+  const hudO = document.getElementById("hud-o");
+  const hudH = document.getElementById("hud-h");
+  const hudL = document.getElementById("hud-l");
+  const hudC = document.getElementById("hud-c");
+  
+  if (hudO && hudH && hudL && hudC) {
+    hudO.textContent = candle.o.toFixed(5);
+    hudH.textContent = candle.h.toFixed(5);
+    hudL.textContent = candle.l.toFixed(5);
+    hudC.textContent = candle.c.toFixed(5);
+    
+    const isBullish = candle.c >= candle.o;
+    const cls = isBullish ? "up" : "down";
+    
+    hudO.className = cls;
+    hudH.className = cls;
+    hudL.className = cls;
+    hudC.className = cls;
+  }
+}
+
+function showChartTooltip(e, candle, index, x, y) {}
+function hideChartTooltip() {}
 
 // Cálculos auxiliares para EMA
 function calcEMA(prices, period) {
@@ -815,33 +1108,6 @@ function calcEMA(prices, period) {
     ema.push(prices[i] * k + ema[i-1] * (1 - k));
   }
   return ema;
-}
-
-// Tooltip del gráfico
-function showChartTooltip(e, candle, index, x, y) {
-  const tooltip = document.getElementById("chart-tooltip");
-  const timeStr = new Date(candle.t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  
-  tooltip.innerHTML = `
-    <div style="color: var(--neon-cyan); font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; margin-bottom: 4px;">Hora: ${timeStr}</div>
-    O: <span style="float: right; font-weight:700;">${candle.o.toFixed(5)}</span><br>
-    H: <span style="float: right; font-weight:700;">${candle.h.toFixed(5)}</span><br>
-    L: <span style="float: right; font-weight:700;">${candle.l.toFixed(5)}</span><br>
-    C: <span style="float: right; font-weight:700;">${candle.c.toFixed(5)}</span>
-  `;
-  
-  tooltip.style.display = "block";
-  
-  // Posicionar relativo al contenedor del gráfico
-  const wrapperRect = document.querySelector(".chart-wrapper").getBoundingClientRect();
-  
-  // tooltip width ~120px, height ~90px
-  tooltip.style.left = `${x - 60}px`;
-  tooltip.style.top = `${y - 105}px`;
-}
-
-function hideChartTooltip() {
-  document.getElementById("chart-tooltip").style.display = "none";
 }
 
 // ─── Alertas Sonoras (Web Audio API) ──────────────────────────────────────────
