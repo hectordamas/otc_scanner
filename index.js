@@ -168,6 +168,19 @@ function initDOMEvents() {
   // Filtrado y búsqueda
   document.getElementById("search-input").addEventListener("input", filterAndRenderPairs);
   document.getElementById("filter-dir").addEventListener("change", filterAndRenderPairs);
+
+  // Botón volver en móvil
+  const btnBack = document.getElementById("btn-back-to-list");
+  if (btnBack) {
+    btnBack.addEventListener("click", () => {
+      const dashboard = document.getElementById("dashboard-content");
+      if (dashboard) {
+        dashboard.classList.remove("show-detail");
+      }
+      state.selectedPair = null;
+      document.querySelectorAll(".pair-row").forEach(r => r.classList.remove("active"));
+    });
+  }
 }
 
 function updateModeUI() {
@@ -613,6 +626,12 @@ function renderPairsGroup(elementId, list) {
       
       state.selectedPair = p;
       renderDetailPanel(p);
+
+      // En móvil, activar la vista de detalle
+      const dashboard = document.getElementById("dashboard-content");
+      if (dashboard) {
+        dashboard.classList.add("show-detail");
+      }
     });
 
     container.appendChild(row);

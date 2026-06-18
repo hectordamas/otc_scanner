@@ -636,6 +636,36 @@ body {
   padding-bottom: 16px;
 }
 
+.detail-title-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-back-mobile {
+  display: none;
+  padding: 8px;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(30, 41, 73, 0.4);
+  border: 1px solid var(--border-color);
+  color: var(--text-white);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-back-mobile:hover {
+  background-color: rgba(30, 41, 73, 0.8);
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+}
+.btn-back-mobile .icon {
+  width: 20px;
+  height: 20px;
+}
+
 .detail-header-row h2 {
   font-size: 24px;
   font-weight: 800;
@@ -1139,6 +1169,7 @@ body {
     border-right: none;
     border-bottom: 1px solid var(--border-color);
     height: 450px;
+    flex-shrink: 0;
   }
   .detail-panel {
     height: auto;
@@ -1147,5 +1178,154 @@ body {
   body {
     overflow-y: auto;
     height: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Ajustes del Body y Contenedor Principal */
+  body {
+    overflow: hidden;
+    height: 100vh;
+  }
+  .app-container {
+    height: 100vh;
+    overflow: hidden;
+  }
+  
+  /* Cabecera Responsiva */
+  .topbar {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 10px 16px;
+  }
+  .brand {
+    order: 1;
+  }
+  .header-actions {
+    order: 2;
+  }
+  .scanner-status-bar {
+    order: 3;
+    width: 100%;
+    justify-content: space-between;
+    border-radius: 8px;
+    padding: 6px 12px;
+    gap: 8px;
+  }
+  .status-item {
+    gap: 4px;
+  }
+  
+  /* Enrutamiento de Paneles Deslizantes (Slide) */
+  .dashboard-content {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 108px); /* Ajuste exacto para la cabecera en 2 filas */
+    overflow: hidden;
+    display: block;
+  }
+  
+  .assets-panel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100% !important;
+    height: 100% !important;
+    border-bottom: none;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 2;
+  }
+  
+  .detail-panel {
+    position: absolute;
+    top: 0;
+    left: 100%;
+    width: 100%;
+    height: 100%;
+    z-index: 5;
+    background-color: var(--bg-main);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex !important;
+    overflow-y: auto;
+  }
+  
+  /* Comportamiento al seleccionar par */
+  .dashboard-content.show-detail .assets-panel {
+    transform: translateX(-100%);
+  }
+  .dashboard-content.show-detail .detail-panel {
+    transform: translateX(-100%);
+  }
+  
+  /* Habilitar botón volver */
+  .btn-back-mobile {
+    display: inline-flex !important;
+  }
+  
+  /* Detalle interno optimizado */
+  .detail-data-container {
+    padding: 16px;
+    gap: 16px;
+  }
+  .detail-header-row {
+    padding-bottom: 12px;
+  }
+  .detail-header-row h2 {
+    font-size: 20px;
+  }
+  
+  /* Gráfico SVG ligeramente reducido */
+  .chart-container {
+    height: 190px;
+  }
+  
+  /* Cuadrícula de métricas en 2 columnas compactas */
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .metric-card {
+    padding: 10px 12px;
+    gap: 6px;
+  }
+  .metric-info .value {
+    font-size: 16px;
+  }
+  .metric-info .label {
+    font-size: 9px;
+    letter-spacing: 0.5px;
+  }
+  
+  /* Metadatos */
+  .meta-section {
+    padding: 12px;
+    gap: 8px;
+  }
+  .meta-item {
+    min-width: 120px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Simplificaciones en cabecera para pantallas muy angostas */
+  .status-item .label {
+    display: none; /* Oculta "ESTADO:", "ÚLTIMO SCAN:", "ACTIVOS:" */
+  }
+  .status-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+  .status-item.divider {
+    margin: 0 2px;
+  }
+  
+  /* Sidebar de Ajustes */
+  .settings-sidebar {
+    width: 100%;
+    right: -100%;
+  }
+  .settings-sidebar.open {
+    right: 0;
   }
 }
