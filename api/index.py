@@ -534,36 +534,48 @@ def execute_complete_scan(api, s: dict):
 # ─── Bucle en Segundo Plano para Modo Local ───────────────────────────────────
 
 def local_background_scan_loop():
-    print("Ejecutando escaneo inicial en segundo plano...")
-    if GLOBAL_STATE["is_connected"] and GLOBAL_STATE["api"]:
-        GLOBAL_STATE["is_scanning"] = True
-        GLOBAL_STATE["scan_progress"] = 0
-        try:
-            print(f"Escaneando activos al iniciar: {datetime.now().strftime('%H:%M:%S')}...")
-            for event_type, *args in execute_complete_scan(GLOBAL_STATE["api"], GLOBAL_STATE["settings"]):
-                if event_type == "progress":
-                    pair, idx, total = args
-                    GLOBAL_STATE["scan_active_pair"] = pair
-                    GLOBAL_STATE["scan_index"] = idx
-                    GLOBAL_STATE["scan_total"] = total
-                    GLOBAL_STATE["scan_progress"] = int((idx / total) * 100)
-                elif event_type == "results":
-                    ordered, missing_consts, total_pairs = args
-                    GLOBAL_STATE["latest_results"] = ordered
-                    GLOBAL_STATE["missing_consts"] = missing_consts
-                    GLOBAL_STATE["pairs_scanned"] = total_pairs
-            
-            GLOBAL_STATE["last_scan_time"] = datetime.now().strftime("%H:%M:%S")
-            GLOBAL_STATE["conn_error"] = ""
-        except Exception as e:
-            print(f"Error en escaneo inicial: {e}")
-            GLOBAL_STATE["conn_error"] = str(e)
-        finally:
-            GLOBAL_STATE["is_scanning"] = False
+    print("Iniciando bucle de escaneo en segundo plano (Modo Local)...")
+    GLOBAL_STATE["bg_loop_active"] = True
+    
+    while GLOBAL_STATE["bg_loop_active"]:
+        # Solo ejecutar si está conectado y no hay otro escaneo en curso
+        if GLOBAL_STATE["is_connected"] and GLOBAL_STATE["api"] and not GLOBAL_STATE["is_scanning"]:
+            GLOBAL_STATE["is_scanning"] = True
             GLOBAL_STATE["scan_progress"] = 0
-            GLOBAL_STATE["scan_active_pair"] = ""
-            GLOBAL_STATE["scan_index"] = 0
-            GLOBAL_STATE["scan_total"] = 0
+            try:
+                print(f"Escaneando activos (Bucle automático): {datetime.now().strftime('%H:%M:%S')}...")
+                for event_type, *args in execute_complete_scan(GLOBAL_STATE["api"], GLOBAL_STATE["settings"]):
+                    if event_type == "progress":
+                        pair, idx, total = args
+                        GLOBAL_STATE["scan_active_pair"] = pair
+                        GLOBAL_STATE["scan_index"] = idx
+                        GLOBAL_STATE["scan_total"] = total
+                        GLOBAL_STATE["scan_progress"] = int((idx / total) * 100)
+                    elif event_type == "results":
+                        ordered, missing_consts, total_pairs = args
+                        GLOBAL_STATE["latest_results"] = ordered
+                        GLOBAL_STATE["missing_consts"] = missing_consts
+                        GLOBAL_STATE["pairs_scanned"] = total_pairs
+                
+                GLOBAL_STATE["last_scan_time"] = datetime.now().strftime("%H:%M:%S")
+                GLOBAL_STATE["conn_error"] = ""
+            except Exception as e:
+                print(f"Error en escaneo en segundo plano: {e}")
+                GLOBAL_STATE["conn_error"] = str(e)
+            finally:
+                GLOBAL_STATE["is_scanning"] = False
+                GLOBAL_STATE["scan_progress"] = 0
+                GLOBAL_STATE["scan_active_pair"] = ""
+                GLOBAL_STATE["scan_index"] = 0
+                GLOBAL_STATE["scan_total"] = 0
+        
+        # Esperar 60 segundos o hasta que se desactive el bucle
+        for _ in range(60):
+            if not GLOBAL_STATE["bg_loop_active"] or not GLOBAL_STATE["is_connected"]:
+                break
+            time.sleep(1)
+            
+    print("Bucle de escaneo en segundo plano finalizado.")
 
 # ─── Endpoints API ────────────────────────────────────────────────────────────
 
@@ -599,30 +611,6 @@ def login(req: LoginRequest, background_tasks: BackgroundTasks):
             if not GLOBAL_STATE["bg_loop_active"]:
                 thread = threading.Thread(target=local_background_scan_loop, daemon=True)
                 thread.start()
-            
-            # Ejecutar un escaneo inmediato asíncrono para tener datos rápido
-            def init_scan():
-                GLOBAL_STATE["is_scanning"] = True
-                try:
-                    for event_type, *args in execute_complete_scan(api, GLOBAL_STATE["settings"]):
-                        if event_type == "progress":
-                            pair, idx, total = args
-                            GLOBAL_STATE["scan_active_pair"] = pair
-                            GLOBAL_STATE["scan_index"] = idx
-                            GLOBAL_STATE["scan_total"] = total
-                            GLOBAL_STATE["scan_progress"] = int((idx / total) * 100)
-                        elif event_type == "results":
-                            ordered, missing_consts, total_pairs = args
-                            GLOBAL_STATE["latest_results"] = ordered
-                            GLOBAL_STATE["missing_consts"] = missing_consts
-                            GLOBAL_STATE["pairs_scanned"] = total_pairs
-                    GLOBAL_STATE["last_scan_time"] = datetime.now().strftime("%H:%M:%S")
-                except Exception as e:
-                    GLOBAL_STATE["conn_error"] = str(e)
-                finally:
-                    GLOBAL_STATE["is_scanning"] = False
-            
-            background_tasks.add_task(init_scan)
 
         return {
             "success": True,
@@ -640,6 +628,7 @@ def login(req: LoginRequest, background_tasks: BackgroundTasks):
 @app.post("/api/logout")
 def logout():
     """Cierra la sesión y desconecta del websocket de IQ Option."""
+    GLOBAL_STATE["bg_loop_active"] = False
     if GLOBAL_STATE["api"]:
         try:
             GLOBAL_STATE["api"].disconnect()
