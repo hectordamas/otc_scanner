@@ -452,22 +452,30 @@ def connect_iq(email: str, password: str) -> Optional[IQ_Option]:
         raise Exception(f"Fallo de conexión: {reason}")
     api.change_balance("PRACTICE")
     try:
-        api.update_ACTIVES_OPCODE()
+        api.get_ALL_Binary_ACTIVES_OPCODE()
     except Exception:
         pass
     return api
 
 def get_otc_pairs_list(api) -> List[str]:
     try:
-        all_assets = api.get_all_open_time()
+        binary_data = api.get_all_init_v2()
     except Exception as e:
         print(f"Error al obtener activos: {e}")
         return []
     pairs = []
-    for category in all_assets.values():
-        for name, info in category.items():
-            if "OTC" in name.upper() and info.get("open", False):
-                pairs.append(name)
+    binary_list = ["binary", "turbo"]
+    if binary_data:
+        for option in binary_list:
+            if option in binary_data:
+                for actives_id in binary_data[option]["actives"]:
+                    active = binary_data[option]["actives"][actives_id]
+                    raw_name = str(active.get("name", ""))
+                    parts = raw_name.split(".")
+                    name = parts[1] if len(parts) > 1 else raw_name
+                    is_open = active.get("enabled") == True and active.get("is_suspended") != True
+                    if is_open and "OTC" in name.upper():
+                        pairs.append(name)
     return sorted(set(pairs))
 
 def scan_single_pair(api, pair: str, s: dict) -> Optional[dict]:
