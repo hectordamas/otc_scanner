@@ -85,6 +85,9 @@ class LoginRequest(BaseModel):
 class SettingsUpdateRequest(BaseModel):
     settings: Dict[str, float]
 
+class OpenTelegramRequest(BaseModel):
+    url: Optional[str] = "tg://resolve?domain=telegram"
+
 # ─── Funciones Matemáticas (Copiadas exactamente de otc_scanner.py) ───────────
 
 def calc_ema(prices: List[float], period: int) -> float:
@@ -806,23 +809,81 @@ def get_instant_scan(
 
 # ─── Servir Frontend Estático en Local ────────────────────────────────────────
 
+BASE_DIR = getattr(sys, '_MEIPASS', os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Cargar variables de entorno desde .env si existe
+env_path = os.path.join(BASE_DIR, ".env")
+if os.path.exists(env_path):
+    try:
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    os.environ[k.strip()] = v.strip().strip('"').strip("'")
+    except Exception as e:
+        print(f"Error cargando .env: {e}")
+
+ENV_EMAIL = os.environ.get("IQ_EMAIL", "").strip()
+ENV_PASSWORD = os.environ.get("IQ_PASSWORD", "").strip()
+
+def get_static_path(filename: str) -> str:
+    root_file = os.path.join(BASE_DIR, filename)
+    if os.path.exists(root_file):
+        return root_file
+    src_file = os.path.join(BASE_DIR, "src", filename)
+    if os.path.exists(src_file):
+        return src_file
+    return filename
+
 @app.get("/index.css")
 def get_css():
-    path = "index.css" if os.path.exists("index.css") else "src/index.css"
-    return FileResponse(path, headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
+    return FileResponse(get_static_path("index.css"), headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
 
 @app.get("/index.js")
 def get_js():
-    path = "index.js" if os.path.exists("index.js") else "src/index.js"
-    return FileResponse(path, headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
+    return FileResponse(get_static_path("index.js"), headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
 
 @app.get("/")
 def get_index():
-    return FileResponse("index.html", headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
+    return FileResponse(get_static_path("index.html"), headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
+
+@app.get("/favicon.ico")
+def get_favicon_ico():
+    return FileResponse(get_static_path("favicon.ico"), media_type="image/x-icon")
+
+@app.get("/favicon.png")
+def get_favicon_png():
+    return FileResponse(get_static_path("favicon.png"), media_type="image/png")
+
+@app.post("/api/open-telegram")
+def open_telegram(req: Optional[OpenTelegramRequest] = None):
+    import webbrowser
+    target_url = req.url if (req and req.url) else "tg://resolve?domain=telegram"
+    try:
+        webbrowser.open(target_url)
+        return {"status": "ok", "url": target_url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.on_event("startup")
 def startup_event():
-    print("OTC Scanner API iniciada. Esperando login desde el cliente web...")
+    print("OTC Scanner API iniciada.")
+    if ENV_EMAIL and ENV_PASSWORD and not GLOBAL_STATE["is_connected"]:
+        print(f"Iniciando auto-conexión inicial desde .env para {ENV_EMAIL}...")
+        try:
+            api = connect_iq(ENV_EMAIL, ENV_PASSWORD)
+            GLOBAL_STATE["email"] = ENV_EMAIL
+            GLOBAL_STATE["password"] = ENV_PASSWORD
+            GLOBAL_STATE["api"] = api
+            GLOBAL_STATE["is_connected"] = True
+            GLOBAL_STATE["conn_error"] = ""
+            thread = threading.Thread(target=local_background_scan_loop, daemon=True)
+            thread.start()
+            print("Auto-conexión inicial completada con éxito.")
+        except Exception as e:
+            print(f"Advertencia en auto-conexión inicial: {e}")
+            GLOBAL_STATE["conn_error"] = str(e)
 
 @app.on_event("shutdown")
 def shutdown_event():

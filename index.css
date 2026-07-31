@@ -305,6 +305,27 @@ body {
   transform: translateY(-2px);
   box-shadow: 0 0 18px rgba(244, 63, 94, 0.65);
 }
+
+.btn-telegram {
+  background: linear-gradient(135deg, #229ED9, #0088cc);
+  color: var(--text-white);
+  box-shadow: 0 0 12px rgba(34, 158, 217, 0.4);
+}
+.btn-telegram:hover {
+  background: linear-gradient(135deg, #2cb0f1, #0099e6);
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(34, 158, 217, 0.75);
+  color: #ffffff;
+}
+.btn-telegram:active {
+  transform: translateY(0);
+}
+.btn-telegram .telegram-icon {
+  transition: transform 0.3s ease;
+}
+.btn-telegram:hover .telegram-icon {
+  transform: rotate(-12deg) scale(1.15);
+}
 .btn-danger:active {
   transform: translateY(0);
 }

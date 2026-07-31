@@ -52,22 +52,22 @@ async function checkInitialConnection() {
     const data = await response.json();
     if (data.is_connected) {
       state.isConnected = true;
-      state.email = data.email || "";
-      document.getElementById("input-email").value = state.email;
+      if (data.email) {
+        state.email = data.email;
+        document.getElementById("input-email").value = state.email;
+      }
       updateStatusUI("connected", "CONECTADO");
       toggleSettings(false);
-      
-      // Sincronizar ajustes al backend
       updateBackendSettings();
-      
-      // Forzar polling inmediato
       pollLocalScanStatus();
     } else {
-      // Si no está conectado pero el navegador tiene credenciales, intentar conectar
       if (state.email && state.password) {
         connectBackend();
       } else {
-        // Si no hay datos, abrir panel
+        // Si el backend reporta error previo, mostrar estado de error
+        if (data.conn_error) {
+          updateStatusUI("error", "ERROR CONEXIÓN");
+        }
         toggleSettings(true);
       }
     }
@@ -194,9 +194,33 @@ function initDOMEvents() {
         dashboard.classList.remove("show-detail");
       }
       state.selectedPair = null;
-      document.querySelectorAll(".pair-row").forEach(r => r.classList.remove("active"));
-    });
+  // Botones de Telegram Journal (Mensajes Guardados)
+  const btnTgHeader = document.getElementById("btn-telegram-journal");
+  if (btnTgHeader) {
+    btnTgHeader.addEventListener("click", openTelegramJournal);
   }
+  const btnTgAlarm = document.getElementById("btn-telegram-alarm");
+  if (btnTgAlarm) {
+    btnTgAlarm.addEventListener("click", openTelegramJournal);
+  }
+}
+
+// ─── Abrir Telegram Desktop (Guardados / Journal) ─────────────────────────
+async function openTelegramJournal() {
+  const telegramUrl = localStorage.getItem("otc_telegram_url") || "tg://resolve?domain=telegram";
+  
+  try {
+    const response = await fetch(getApiUrl("/api/open-telegram"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: telegramUrl })
+    });
+    if (response.ok) return;
+  } catch (err) {
+    console.log("No se pudo contactar al backend local, usando fallback web para Telegram...");
+  }
+
+  window.open(telegramUrl, "_blank");
 }
 
 function updateModeUI() {
