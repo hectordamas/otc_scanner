@@ -194,6 +194,10 @@ function initDOMEvents() {
         dashboard.classList.remove("show-detail");
       }
       state.selectedPair = null;
+      document.querySelectorAll(".pair-row").forEach(r => r.classList.remove("active"));
+    });
+  }
+
   // Botones de Telegram Journal (Mensajes Guardados)
   const btnTgHeader = document.getElementById("btn-telegram-journal");
   if (btnTgHeader) {
