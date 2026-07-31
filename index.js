@@ -36,6 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadSavedConfig();
   initDOMEvents();
   initSettingsUI();
+  initTimerUI();
   
   // Verificar el estado de conexión inicial en el backend (soporta auto-login)
   checkInitialConnection();
@@ -1197,4 +1198,532 @@ function playNote(frequency, startTime, duration) {
 
   osc.start(startTime);
   osc.stop(startTime + duration);
+}
+
+// ─── Estado y Lógica del Temporizador / Cronómetro de Sesión ───────────────
+const timerState = {
+  durationMinutes: 30,
+  totalSeconds: 1800,
+  remainingSeconds: 1800,
+  elapsedSeconds: 0,
+  mode: "countdown", // "countdown" o "stopwatch"
+  isRunning: false,
+  isPaused: false,
+  isFinished: false,
+  alarmEnabled: true,
+  alarmTone: "digital", // "digital", "radar", "siren", "chime"
+  intervalId: null,
+  alarmLoopId: null
+};
+
+function initTimerUI() {
+  loadTimerConfig();
+  bindTimerEvents();
+  renderTimerUI();
+}
+
+function loadTimerConfig() {
+  const savedMins = parseInt(localStorage.getItem("otc_timer_mins") || "30", 10);
+  const savedMode = localStorage.getItem("otc_timer_mode") || "countdown";
+  const savedAlarm = localStorage.getItem("otc_timer_alarm") !== "false";
+  const savedTone = localStorage.getItem("otc_timer_tone") || "digital";
+
+  timerState.durationMinutes = savedMins > 0 ? savedMins : 30;
+  timerState.totalSeconds = timerState.durationMinutes * 60;
+  timerState.remainingSeconds = timerState.totalSeconds;
+  timerState.elapsedSeconds = 0;
+  timerState.mode = savedMode;
+  timerState.alarmEnabled = savedAlarm;
+  timerState.alarmTone = savedTone;
+
+  // Actualizar UI de inputs
+  const customMinsInput = document.getElementById("input-custom-mins");
+  if (customMinsInput) customMinsInput.value = timerState.durationMinutes;
+
+  const alarmCheck = document.getElementById("check-session-alarm");
+  if (alarmCheck) alarmCheck.checked = timerState.alarmEnabled;
+
+  const toneSelect = document.getElementById("select-alarm-tone");
+  if (toneSelect) toneSelect.value = timerState.alarmTone;
+
+  updatePresetButtonsUI(timerState.durationMinutes);
+  updateModeButtonsUI(timerState.mode);
+}
+
+function saveTimerConfig() {
+  localStorage.setItem("otc_timer_mins", timerState.durationMinutes);
+  localStorage.setItem("otc_timer_mode", timerState.mode);
+  localStorage.setItem("otc_timer_alarm", timerState.alarmEnabled);
+  localStorage.setItem("otc_timer_tone", timerState.alarmTone);
+}
+
+function bindTimerEvents() {
+  // Toggle popover de configuración
+  const btnTogglePopover = document.getElementById("btn-toggle-timer-menu");
+  const popover = document.getElementById("timer-popover");
+  const btnClosePopover = document.getElementById("btn-close-timer-popover");
+
+  if (btnTogglePopover && popover) {
+    btnTogglePopover.addEventListener("click", (e) => {
+      e.stopPropagation();
+      popover.style.display = popover.style.display === "none" ? "block" : "none";
+    });
+  }
+
+  if (btnClosePopover && popover) {
+    btnClosePopover.addEventListener("click", (e) => {
+      e.stopPropagation();
+      popover.style.display = "none";
+    });
+  }
+
+  // Cerrar popover al hacer clic fuera
+  document.addEventListener("click", (e) => {
+    if (popover && popover.style.display !== "none") {
+      const widget = document.getElementById("timer-widget");
+      if (widget && !widget.contains(e.target)) {
+        popover.style.display = "none";
+      }
+    }
+  });
+
+  // Botón Iniciar / Pausar
+  const btnStart = document.getElementById("btn-timer-start");
+  if (btnStart) {
+    btnStart.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleTimerPlay();
+    });
+  }
+
+  // Botón Reiniciar
+  const btnReset = document.getElementById("btn-timer-reset");
+  if (btnReset) {
+    btnReset.addEventListener("click", (e) => {
+      e.stopPropagation();
+      resetTimer();
+    });
+  }
+
+  // Selección de Modos (Countdown vs Stopwatch)
+  const modeBtnCountdown = document.getElementById("mode-btn-countdown");
+  const modeBtnStopwatch = document.getElementById("mode-btn-stopwatch");
+
+  if (modeBtnCountdown) {
+    modeBtnCountdown.addEventListener("click", () => setTimerMode("countdown"));
+  }
+  if (modeBtnStopwatch) {
+    modeBtnStopwatch.addEventListener("click", () => setTimerMode("stopwatch"));
+  }
+
+  // Presets rápidos (15m, 30m, 45m, 60m)
+  const presetBtns = document.querySelectorAll(".preset-btn");
+  presetBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const mins = parseInt(btn.getAttribute("data-mins"), 10);
+      if (mins > 0) {
+        setTimerDuration(mins);
+      }
+    });
+  });
+
+  // Aplicar tiempo personalizado
+  const btnApplyCustom = document.getElementById("btn-apply-custom-time");
+  const inputCustom = document.getElementById("input-custom-mins");
+  if (btnApplyCustom && inputCustom) {
+    btnApplyCustom.addEventListener("click", () => {
+      const mins = parseInt(inputCustom.value, 10);
+      if (mins > 0 && mins <= 300) {
+        setTimerDuration(mins);
+      }
+    });
+  }
+
+  // Ajustes de Alarma
+  const checkAlarm = document.getElementById("check-session-alarm");
+  if (checkAlarm) {
+    checkAlarm.addEventListener("change", (e) => {
+      timerState.alarmEnabled = e.target.checked;
+      saveTimerConfig();
+    });
+  }
+
+  const selectTone = document.getElementById("select-alarm-tone");
+  if (selectTone) {
+    selectTone.addEventListener("change", (e) => {
+      timerState.alarmTone = e.target.value;
+      saveTimerConfig();
+    });
+  }
+
+  const btnTestAlarm = document.getElementById("btn-test-alarm");
+  if (btnTestAlarm) {
+    btnTestAlarm.addEventListener("click", (e) => {
+      e.stopPropagation();
+      playAlarmSound(timerState.alarmTone);
+    });
+  }
+
+  // Botones del Modal de Alarma
+  const btnStopAlarm = document.getElementById("btn-stop-alarm");
+  if (btnStopAlarm) {
+    btnStopAlarm.addEventListener("click", stopSessionAlarm);
+  }
+
+  const btnExtend5m = document.getElementById("btn-extend-5m");
+  if (btnExtend5m) {
+    btnExtend5m.addEventListener("click", () => extendSession(5));
+  }
+
+  const btnNewSession = document.getElementById("btn-new-session");
+  if (btnNewSession) {
+    btnNewSession.addEventListener("click", startNewSession);
+  }
+}
+
+function toggleTimerPlay() {
+  if (timerState.isRunning) {
+    pauseTimer();
+  } else {
+    startTimer();
+  }
+}
+
+function startTimer() {
+  if (timerState.isRunning) return;
+
+  if (timerState.isFinished) {
+    timerState.isFinished = false;
+    timerState.remainingSeconds = timerState.totalSeconds;
+    timerState.elapsedSeconds = 0;
+  }
+
+  timerState.isRunning = true;
+  timerState.isPaused = false;
+
+  if (timerState.intervalId) clearInterval(timerState.intervalId);
+  timerState.intervalId = setInterval(tickTimer, 1000);
+
+  renderTimerUI();
+}
+
+function pauseTimer() {
+  if (!timerState.isRunning) return;
+
+  timerState.isRunning = false;
+  timerState.isPaused = true;
+
+  if (timerState.intervalId) {
+    clearInterval(timerState.intervalId);
+    timerState.intervalId = null;
+  }
+
+  renderTimerUI();
+}
+
+function resetTimer() {
+  if (timerState.intervalId) {
+    clearInterval(timerState.intervalId);
+    timerState.intervalId = null;
+  }
+
+  stopAlarmSoundLoop();
+
+  timerState.isRunning = false;
+  timerState.isPaused = false;
+  timerState.isFinished = false;
+  timerState.remainingSeconds = timerState.totalSeconds;
+  timerState.elapsedSeconds = 0;
+
+  renderTimerUI();
+}
+
+function setTimerDuration(minutes) {
+  timerState.durationMinutes = minutes;
+  timerState.totalSeconds = minutes * 60;
+  saveTimerConfig();
+  updatePresetButtonsUI(minutes);
+  resetTimer();
+}
+
+function setTimerMode(mode) {
+  timerState.mode = mode;
+  saveTimerConfig();
+  updateModeButtonsUI(mode);
+  renderTimerUI();
+}
+
+function tickTimer() {
+  if (timerState.mode === "countdown") {
+    if (timerState.remainingSeconds > 0) {
+      timerState.remainingSeconds--;
+      timerState.elapsedSeconds++;
+    }
+
+    if (timerState.remainingSeconds <= 0) {
+      triggerSessionFinished();
+    }
+  } else {
+    // Modo Cronómetro
+    timerState.elapsedSeconds++;
+    if (timerState.totalSeconds > 0) {
+      timerState.remainingSeconds = Math.max(0, timerState.totalSeconds - timerState.elapsedSeconds);
+      if (timerState.elapsedSeconds >= timerState.totalSeconds) {
+        triggerSessionFinished();
+      }
+    }
+  }
+
+  renderTimerUI();
+}
+
+function triggerSessionFinished() {
+  pauseTimer();
+  timerState.isFinished = true;
+  renderTimerUI();
+
+  if (timerState.alarmEnabled) {
+    startAlarmSoundLoop(timerState.alarmTone);
+  }
+
+  const modalBackdrop = document.getElementById("alarm-modal-backdrop");
+  const durationText = document.getElementById("alarm-session-duration");
+  if (durationText) {
+    durationText.textContent = formatTime(timerState.totalSeconds);
+  }
+  if (modalBackdrop) {
+    modalBackdrop.style.display = "flex";
+  }
+}
+
+function stopSessionAlarm() {
+  stopAlarmSoundLoop();
+
+  const modalBackdrop = document.getElementById("alarm-modal-backdrop");
+  if (modalBackdrop) {
+    modalBackdrop.style.display = "none";
+  }
+}
+
+function extendSession(extraMinutes) {
+  stopSessionAlarm();
+
+  const extraSecs = extraMinutes * 60;
+  timerState.totalSeconds += extraSecs;
+  timerState.remainingSeconds += extraSecs;
+  timerState.durationMinutes += extraMinutes;
+  timerState.isFinished = false;
+
+  const customInput = document.getElementById("input-custom-mins");
+  if (customInput) customInput.value = timerState.durationMinutes;
+
+  startTimer();
+}
+
+function startNewSession() {
+  stopSessionAlarm();
+  resetTimer();
+  startTimer();
+}
+
+function renderTimerUI() {
+  const clockEl = document.getElementById("timer-clock");
+  const statusDot = document.getElementById("timer-status-dot");
+  const playIcon = document.getElementById("timer-play-icon");
+  const btnPlay = document.getElementById("btn-timer-start");
+  const progressFill = document.getElementById("timer-progress-fill");
+  const modeLabel = document.getElementById("timer-mode-label");
+
+  let displaySeconds = timerState.mode === "countdown" ? timerState.remainingSeconds : timerState.elapsedSeconds;
+  if (clockEl) {
+    clockEl.textContent = formatTime(displaySeconds);
+    if (timerState.isFinished) {
+      clockEl.classList.add("finished");
+    } else {
+      clockEl.classList.remove("finished");
+    }
+  }
+
+  if (modeLabel) {
+    modeLabel.textContent = timerState.mode === "countdown" ? "TEMPORIZADOR" : "CRONÓMETRO";
+  }
+
+  if (statusDot) {
+    statusDot.className = "timer-status-dot";
+    if (timerState.isFinished) {
+      statusDot.classList.add("finished");
+    } else if (timerState.isRunning) {
+      statusDot.classList.add("running");
+    } else if (timerState.isPaused) {
+      statusDot.classList.add("paused");
+    }
+  }
+
+  if (playIcon && btnPlay) {
+    if (timerState.isRunning) {
+      btnPlay.title = "Pausar sesión";
+      btnPlay.classList.add("running");
+      playIcon.innerHTML = '<path fill="currentColor" d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+    } else {
+      btnPlay.title = "Iniciar sesión";
+      btnPlay.classList.remove("running");
+      playIcon.innerHTML = '<path fill="currentColor" d="M8 5v14l11-7z"/>';
+    }
+  }
+
+  if (progressFill && timerState.totalSeconds > 0) {
+    let pct = 100;
+    if (timerState.mode === "countdown") {
+      pct = (timerState.remainingSeconds / timerState.totalSeconds) * 100;
+    } else {
+      pct = Math.min(100, (timerState.elapsedSeconds / timerState.totalSeconds) * 100);
+    }
+    progressFill.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+  }
+}
+
+function formatTime(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+
+  const mm = String(m).padStart(2, "0");
+  const ss = String(s).padStart(2, "0");
+
+  if (h > 0) {
+    const hh = String(h).padStart(2, "0");
+    return `${hh}:${mm}:${ss}`;
+  }
+  return `${mm}:${ss}`;
+}
+
+function updatePresetButtonsUI(activeMins) {
+  const presetBtns = document.querySelectorAll(".preset-btn");
+  presetBtns.forEach(btn => {
+    const mins = parseInt(btn.getAttribute("data-mins"), 10);
+    if (mins === activeMins) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+}
+
+function updateModeButtonsUI(activeMode) {
+  const modeBtnCountdown = document.getElementById("mode-btn-countdown");
+  const modeBtnStopwatch = document.getElementById("mode-btn-stopwatch");
+
+  if (modeBtnCountdown && modeBtnStopwatch) {
+    if (activeMode === "countdown") {
+      modeBtnCountdown.classList.add("active");
+      modeBtnStopwatch.classList.remove("active");
+    } else {
+      modeBtnStopwatch.classList.add("active");
+      modeBtnCountdown.classList.remove("active");
+    }
+  }
+}
+
+// ─── Sintetizador de Sonidos de Alarma (Web Audio API) ───────────────────────
+function playAlarmSound(tone) {
+  try {
+    if (!state.audioContext) {
+      state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    const ctx = state.audioContext;
+    if (ctx.state === "suspended") {
+      ctx.resume();
+    }
+
+    const now = ctx.currentTime;
+
+    switch (tone) {
+      case "digital":
+        playBeepTone(880, now, 0.08, "square", 0.1);
+        playBeepTone(880, now + 0.12, 0.08, "square", 0.1);
+        playBeepTone(1200, now + 0.24, 0.15, "square", 0.15);
+        break;
+
+      case "radar":
+        playBeepTone(1046.5, now, 0.15, "sine", 0.2);
+        playBeepTone(1318.5, now + 0.18, 0.25, "sine", 0.25);
+        break;
+
+      case "siren":
+        playSirenSweep(now, 0.4);
+        break;
+
+      case "chime":
+        playBeepTone(523.25, now, 0.3, "sine", 0.12);
+        playBeepTone(659.25, now + 0.08, 0.3, "sine", 0.12);
+        playBeepTone(783.99, now + 0.16, 0.3, "sine", 0.12);
+        playBeepTone(1046.5, now + 0.24, 0.5, "sine", 0.15);
+        break;
+
+      default:
+        playBeepTone(880, now, 0.1, "sine", 0.15);
+        break;
+    }
+  } catch (err) {
+    console.warn("Error reproduciendo tono de alarma:", err);
+  }
+}
+
+function playBeepTone(freq, startTime, duration, type = "sine", gainVal = 0.1) {
+  const ctx = state.audioContext;
+  if (!ctx) return;
+
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, startTime);
+
+  gain.gain.setValueAtTime(gainVal, startTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.start(startTime);
+  osc.stop(startTime + duration);
+}
+
+function playSirenSweep(startTime, duration) {
+  const ctx = state.audioContext;
+  if (!ctx) return;
+
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.type = "sawtooth";
+  osc.frequency.setValueAtTime(600, startTime);
+  osc.frequency.exponentialRampToValueAtTime(1400, startTime + duration * 0.5);
+  osc.frequency.exponentialRampToValueAtTime(600, startTime + duration);
+
+  gain.gain.setValueAtTime(0.12, startTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.start(startTime);
+  osc.stop(startTime + duration);
+}
+
+function startAlarmSoundLoop(tone) {
+  stopAlarmSoundLoop();
+
+  playAlarmSound(tone);
+
+  timerState.alarmLoopId = setInterval(() => {
+    playAlarmSound(tone);
+  }, 1500);
+}
+
+function stopAlarmSoundLoop() {
+  if (timerState.alarmLoopId) {
+    clearInterval(timerState.alarmLoopId);
+    timerState.alarmLoopId = null;
+  }
 }

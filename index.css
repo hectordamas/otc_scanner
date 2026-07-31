@@ -1329,3 +1329,436 @@ body {
     right: 0;
   }
 }
+
+/* ─── Temporizador y Cronómetro de Sesión ──────────────────────────────────── */
+.timer-widget {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: rgba(17, 24, 45, 0.55);
+  border: 1px solid var(--border-color);
+  padding: 4px 12px;
+  border-radius: 24px;
+  backdrop-filter: blur(6px);
+  transition: all 0.3s ease;
+}
+
+.timer-widget:hover {
+  border-color: rgba(0, 242, 254, 0.4);
+  box-shadow: 0 0 12px rgba(0, 242, 254, 0.15);
+}
+
+.timer-display-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.timer-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--text-muted);
+  transition: all 0.3s ease;
+}
+
+.timer-status-dot.running {
+  background-color: var(--neon-cyan);
+  box-shadow: var(--glow-cyan);
+  animation: pulse 1.8s infinite ease-out;
+}
+
+.timer-status-dot.paused {
+  background-color: var(--neon-amber);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+}
+
+.timer-status-dot.finished {
+  background-color: var(--neon-red);
+  box-shadow: var(--glow-red);
+  animation: alarm-flash 0.5s infinite alternate;
+}
+
+.timer-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--neon-cyan);
+}
+
+.timer-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.timer-label {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.timer-clock {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-white);
+  letter-spacing: 1px;
+}
+
+.timer-clock.finished {
+  color: var(--neon-red);
+  text-shadow: var(--glow-red);
+  animation: alarm-flash 0.5s infinite alternate;
+}
+
+.timer-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-timer-ctrl {
+  background: rgba(30, 41, 73, 0.6);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-timer-ctrl:hover {
+  background: var(--neon-cyan);
+  color: var(--bg-main);
+  border-color: var(--neon-cyan);
+  box-shadow: var(--glow-cyan);
+}
+
+.btn-timer-ctrl.play.running {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--neon-amber);
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.btn-timer-ctrl.play.running:hover {
+  background: var(--neon-amber);
+  color: var(--bg-main);
+}
+
+.timer-progress-bar-wrap {
+  position: absolute;
+  bottom: -1px;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.timer-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
+  transition: width 0.4s linear;
+}
+
+/* Popover de Configuración */
+.timer-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 280px;
+  background: #0b0f1a;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(0, 242, 254, 0.15);
+  padding: 16px;
+  z-index: 100;
+  animation: fadeInDown 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.popover-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 12px;
+}
+
+.popover-header h4 {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--neon-cyan);
+}
+
+.btn-close-mini {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.btn-close-mini:hover {
+  color: var(--text-white);
+}
+
+.timer-mode-selector {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+  background: rgba(17, 24, 45, 0.8);
+  padding: 3px;
+  border-radius: 6px;
+}
+
+.mode-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 6px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-btn.active {
+  background: var(--neon-cyan);
+  color: var(--bg-main);
+  font-weight: 700;
+}
+
+.presets-section {
+  margin-bottom: 14px;
+}
+
+.presets-section label {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 700;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.presets-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.preset-btn {
+  background: rgba(30, 41, 73, 0.4);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 6px 2px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.preset-btn:hover {
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+}
+
+.preset-btn.active {
+  background: rgba(0, 242, 254, 0.15);
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+  font-weight: 700;
+}
+
+.custom-time-input {
+  margin-bottom: 14px;
+}
+
+.custom-time-input label {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 700;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.custom-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.custom-input-row input {
+  flex: 1;
+  background: rgba(6, 9, 19, 0.8);
+  border: 1px solid var(--border-color);
+  color: var(--text-white);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+.alarm-settings-group {
+  border-top: 1px solid var(--border-color);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.alarm-tone-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.alarm-tone-row select {
+  flex: 1;
+  background: rgba(6, 9, 19, 0.8);
+  border: 1px solid var(--border-color);
+  color: var(--text-white);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+/* Modal de Alarma */
+.alarm-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(4, 7, 15, 0.85);
+  backdrop-filter: blur(10px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.3s ease;
+}
+
+.alarm-modal {
+  background: #0b0f1a;
+  border: 2px solid var(--neon-red);
+  border-radius: 16px;
+  box-shadow: 0 0 40px rgba(244, 63, 94, 0.4), 0 0 80px rgba(244, 63, 94, 0.2);
+  width: 90%;
+  max-width: 440px;
+  padding: 28px;
+  text-align: center;
+  animation: modalPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.alarm-icon-glow {
+  width: 64px;
+  height: 64px;
+  background: rgba(244, 63, 94, 0.15);
+  border: 2px solid var(--neon-red);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px auto;
+  box-shadow: var(--glow-red);
+  animation: alarmPulseRing 1s infinite alternate;
+}
+
+.alarm-bell-icon {
+  width: 36px;
+  height: 36px;
+  color: var(--neon-red);
+}
+
+.alarm-modal-header h2 {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--neon-red);
+  letter-spacing: 1px;
+  text-shadow: var(--glow-red);
+  margin-bottom: 12px;
+}
+
+.alarm-modal-body {
+  margin-bottom: 24px;
+}
+
+.alarm-message {
+  font-size: 14px;
+  color: var(--text-white);
+  margin-bottom: 14px;
+}
+
+.alarm-tip-box {
+  background: rgba(17, 24, 45, 0.6);
+  border-left: 3px solid var(--neon-cyan);
+  padding: 10px 14px;
+  border-radius: 6px;
+  text-align: left;
+  font-size: 12px;
+  color: var(--text-main);
+  line-height: 1.4;
+}
+
+.alarm-tip-box .tip-title {
+  font-weight: 700;
+  color: var(--neon-cyan);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.alarm-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.btn-lg {
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+@keyframes alarmPulseRing {
+  0% { transform: scale(1); box-shadow: 0 0 15px rgba(244, 63, 94, 0.3); }
+  100% { transform: scale(1.15); box-shadow: 0 0 35px rgba(244, 63, 94, 0.8); }
+}
+
+@keyframes alarm-flash {
+  0% { opacity: 1; }
+  100% { opacity: 0.3; }
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes modalPop {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}

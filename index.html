@@ -50,6 +50,83 @@
           <div id="scan-progress-bar" class="progress-bar"></div>
         </div>
       </div>
+
+      <!-- Widget Temporizador / Cronómetro de Sesión -->
+      <div class="timer-widget" id="timer-widget">
+        <div class="timer-display-group" id="btn-toggle-timer-menu" title="Click para opciones del temporizador">
+          <div class="timer-status-dot" id="timer-status-dot"></div>
+          <svg class="icon timer-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M15 1H9v2h6V1zm-2 13h-2V8h2v6zm7.03-6.61l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42A8.962 8.962 0 0 0 12 5c-4.97 0-9 4.03-9 9s4.03 9 9 9s9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 21c-3.87 0-7-3.13-7-7s3.13-7 7-7s7 3.13 7 7s-3.13 7-7 7z"/></svg>
+          <div class="timer-info">
+            <span class="timer-label" id="timer-mode-label">TEMPORIZADOR</span>
+            <span id="timer-clock" class="timer-clock monospace">30:00</span>
+          </div>
+        </div>
+        
+        <div class="timer-controls">
+          <button id="btn-timer-start" class="btn-timer-ctrl play" title="Iniciar / Pausar sesion">
+            <svg class="icon" id="timer-play-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+          </button>
+          <button id="btn-timer-reset" class="btn-timer-ctrl reset" title="Reiniciar temporizador">
+            <svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6s-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8s-3.58-8-8-8z"/></svg>
+          </button>
+        </div>
+
+        <div class="timer-progress-bar-wrap">
+          <div id="timer-progress-fill" class="timer-progress-fill" style="width: 100%;"></div>
+        </div>
+
+        <!-- Popover de Configuración de Temporizador -->
+        <div class="timer-popover" id="timer-popover" style="display: none;">
+          <div class="popover-header">
+            <h4>SESIÓN DE TRADING</h4>
+            <button id="btn-close-timer-popover" class="btn-close-mini">&times;</button>
+          </div>
+          <div class="popover-body">
+            <div class="timer-mode-selector">
+              <button class="mode-btn active" id="mode-btn-countdown" data-mode="countdown">Temporizador (Regresivo)</button>
+              <button class="mode-btn" id="mode-btn-stopwatch" data-mode="stopwatch">Cronómetro (Transcurrido)</button>
+            </div>
+            
+            <div class="presets-section" id="presets-container">
+              <label>DURACIÓN DE SESIÓN:</label>
+              <div class="presets-grid">
+                <button class="preset-btn" data-mins="15">15 min</button>
+                <button class="preset-btn active" data-mins="30">30 min</button>
+                <button class="preset-btn" data-mins="45">45 min</button>
+                <button class="preset-btn" data-mins="60">60 min</button>
+              </div>
+            </div>
+
+            <div class="custom-time-input" id="custom-time-container">
+              <label for="input-custom-mins">Tiempo Personalizado (min):</label>
+              <div class="custom-input-row">
+                <input type="number" id="input-custom-mins" min="1" max="300" value="30">
+                <button id="btn-apply-custom-time" class="btn btn-secondary btn-sm">APLICAR</button>
+              </div>
+            </div>
+
+            <div class="alarm-settings-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="check-session-alarm" checked>
+                <span>Alarma Sonora de Fin de Sesión</span>
+              </label>
+              
+              <div class="alarm-tone-row">
+                <label for="select-alarm-tone">Sonido:</label>
+                <select id="select-alarm-tone">
+                  <option value="digital">Beep Digital</option>
+                  <option value="radar">Radar Pulse</option>
+                  <option value="siren">Sirena Neón</option>
+                  <option value="chime">Chime Suave</option>
+                </select>
+                <button id="btn-test-alarm" class="btn btn-secondary btn-sm" title="Probar sonido">
+                  <svg class="icon" viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       
       <div class="header-actions">
         <button id="btn-refresh" class="btn btn-secondary" title="Escanear ahora">
@@ -385,6 +462,37 @@
     
     <!-- Backdrop de Configuración -->
     <div class="backdrop" id="backdrop"></div>
+  </div>
+
+  <!-- Modal de Alarma de Fin de Sesión -->
+  <div class="alarm-modal-backdrop" id="alarm-modal-backdrop" style="display: none;">
+    <div class="alarm-modal" id="alarm-modal">
+      <div class="alarm-modal-header">
+        <div class="alarm-icon-glow">
+          <svg class="alarm-bell-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg>
+        </div>
+        <h2>¡SESIÓN DE TRADING FINALIZADA!</h2>
+      </div>
+      <div class="alarm-modal-body">
+        <p class="alarm-message">Ha concluido el tiempo programado para tu sesión (<span id="alarm-session-duration" class="monospace">30:00</span> min).</p>
+        <div class="alarm-tip-box">
+          <span class="tip-title">💡 Recomendación OTC Pro:</span>
+          <p>Tómate un descanso, analiza tu bitácora de trades y evita la sobreoperación (<em>overtrading</em>).</p>
+        </div>
+      </div>
+      <div class="alarm-modal-actions">
+        <button id="btn-stop-alarm" class="btn btn-danger btn-lg">
+          <svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6h12v12H6z"/></svg>
+          DETENER ALARMA
+        </button>
+        <button id="btn-extend-5m" class="btn btn-secondary">
+          +5 MINUTOS
+        </button>
+        <button id="btn-new-session" class="btn btn-primary">
+          NUEVA SESIÓN
+        </button>
+      </div>
+    </div>
   </div>
 
   <script src="index.js"></script>
