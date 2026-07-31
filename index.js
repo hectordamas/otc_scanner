@@ -12,6 +12,7 @@ const state = {
   audioContext: null,
   soundEnabled: true,
   strictFilterEnabled: false, // Filtro por R2/Eficiencia/ATR desactivado por defecto (como la terminal)
+  autoScanEnabled: false, // Escaneo automático desactivado por defecto para no perder la lista
   settings: {
     adx_min: 50,
     adx_watch_min: 40,
@@ -89,6 +90,7 @@ function loadSavedConfig() {
   state.backendUrl = localStorage.getItem("otc_backend_url") || "http://localhost:8000";
   state.soundEnabled = localStorage.getItem("otc_sound") !== "false";
   state.strictFilterEnabled = localStorage.getItem("otc_strict_filter") === "true";
+  state.autoScanEnabled = localStorage.getItem("otc_auto_scan") === "true";
 
   // Rellenar UI
   document.getElementById("input-email").value = state.email;
@@ -96,6 +98,8 @@ function loadSavedConfig() {
   document.getElementById("input-backend-url").value = state.backendUrl;
   document.getElementById("check-sound").checked = state.soundEnabled;
   document.getElementById("check-strict-filter").checked = state.strictFilterEnabled;
+  const autoScanCheck = document.getElementById("check-auto-scan");
+  if (autoScanCheck) autoScanCheck.checked = state.autoScanEnabled;
 
   const modeRadios = document.getElementsByName("conn-mode");
   modeRadios.forEach(radio => {
@@ -114,6 +118,7 @@ function saveConfigToStorage() {
   localStorage.setItem("otc_backend_url", state.backendUrl);
   localStorage.setItem("otc_sound", state.soundEnabled);
   localStorage.setItem("otc_strict_filter", state.strictFilterEnabled);
+  localStorage.setItem("otc_auto_scan", state.autoScanEnabled);
 }
 
 // ─── Enrutador de llamadas de API ────────────────────────────────────────────
@@ -165,6 +170,16 @@ function initDOMEvents() {
     saveConfigToStorage();
     filterAndRenderPairs();
   });
+
+  // Checkbox de escaneo automático
+  const autoScanCheck = document.getElementById("check-auto-scan");
+  if (autoScanCheck) {
+    autoScanCheck.addEventListener("change", (e) => {
+      state.autoScanEnabled = e.target.checked;
+      saveConfigToStorage();
+      updateBackendSettings();
+    });
+  }
 
   // Filtrado y búsqueda
   document.getElementById("search-input").addEventListener("input", filterAndRenderPairs);
@@ -279,8 +294,14 @@ async function connectBackend() {
       })
     });
 
-    const data = await response.json();
-    if (data.success) {
+    let data = null;
+    try {
+      data = await response.json();
+    } catch (e) {
+      data = { success: false, message: `Respuesta HTTP ${response.status} no válida.` };
+    }
+
+    if (data && data.success) {
       state.isConnected = true;
       updateStatusUI("connected", "CONECTADO");
       
@@ -296,13 +317,16 @@ async function connectBackend() {
     } else {
       state.isConnected = false;
       updateStatusUI("error", "ERROR LOGIN");
-      alert(`Error al iniciar sesión: ${data.message}`);
+      const errorMsg = (data && (data.message || data.detail)) 
+        ? (data.message || data.detail) 
+        : "IQ Option rechazó la conexión. Si estás en modo Nube (Vercel), IQ Option suele bloquear servidores cloud. Se recomienda usar 'Servidor Local'.";
+      alert(`Error al iniciar sesión: ${errorMsg}`);
     }
   } catch (err) {
     console.error(err);
     state.isConnected = false;
     updateStatusUI("error", "ERROR CONEXIÓN");
-    alert("No se pudo contactar con el backend del escáner. Asegúrate de tener el backend local corriendo.");
+    alert("No se pudo conectar con el servidor backend.\n\n• Si usas 'Servidor Local': Asegúrate de tener corriendo 'python api/index.py' en tu computadora.\n• Si usas 'Nube (Vercel)': Cambia a modo 'Servidor Local' ya que IQ Option bloquea IPs de servidores cloud.");
   }
 }
 
@@ -345,6 +369,7 @@ async function updateBackendSettings() {
     // Traducir atr_max_pct a valor absoluto para el python
     const payload = { ...state.settings };
     payload.atr_max_pct = payload.atr_max_pct / 100; // Ej: 0.30% -> 0.003
+    payload.auto_scan = state.autoScanEnabled;
     
     await fetch(getApiUrl("/api/settings"), {
       method: "POST",

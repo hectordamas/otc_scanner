@@ -54,6 +54,7 @@ DEFAULT_SETTINGS = {
     "adx_accelerating_pct": 0.05,
     "adx_decelerating_pct": -0.05,
     "display_adx_min": 30,
+    "auto_scan": False,
 }
 
 # Estado Global
@@ -534,12 +535,44 @@ def execute_complete_scan(api, s: dict):
 # ─── Bucle en Segundo Plano para Modo Local ───────────────────────────────────
 
 def local_background_scan_loop():
-    print("Iniciando bucle de escaneo en segundo plano (Modo Local)...")
+    print("Iniciando servicio en segundo plano (Modo Local)...")
     GLOBAL_STATE["bg_loop_active"] = True
     
+    # 1. Escaneo inicial al conectar (si aún no hay resultados cacheados)
+    if GLOBAL_STATE["is_connected"] and GLOBAL_STATE["api"] and not GLOBAL_STATE["latest_results"]:
+        GLOBAL_STATE["is_scanning"] = True
+        GLOBAL_STATE["scan_progress"] = 0
+        try:
+            print(f"Escaneando activos iniciales: {datetime.now().strftime('%H:%M:%S')}...")
+            for event_type, *args in execute_complete_scan(GLOBAL_STATE["api"], GLOBAL_STATE["settings"]):
+                if event_type == "progress":
+                    pair, idx, total = args
+                    GLOBAL_STATE["scan_active_pair"] = pair
+                    GLOBAL_STATE["scan_index"] = idx
+                    GLOBAL_STATE["scan_total"] = total
+                    GLOBAL_STATE["scan_progress"] = int((idx / total) * 100)
+                elif event_type == "results":
+                    ordered, missing_consts, total_pairs = args
+                    GLOBAL_STATE["latest_results"] = ordered
+                    GLOBAL_STATE["missing_consts"] = missing_consts
+                    GLOBAL_STATE["pairs_scanned"] = total_pairs
+            
+            GLOBAL_STATE["last_scan_time"] = datetime.now().strftime("%H:%M:%S")
+            GLOBAL_STATE["conn_error"] = ""
+        except Exception as e:
+            print(f"Error en escaneo inicial: {e}")
+            GLOBAL_STATE["conn_error"] = str(e)
+        finally:
+            GLOBAL_STATE["is_scanning"] = False
+            GLOBAL_STATE["scan_progress"] = 0
+            GLOBAL_STATE["scan_active_pair"] = ""
+            GLOBAL_STATE["scan_index"] = 0
+            GLOBAL_STATE["scan_total"] = 0
+
+    # 2. Bucle principal: Solo re-escanea en automático si auto_scan está activo
     while GLOBAL_STATE["bg_loop_active"]:
-        # Solo ejecutar si está conectado y no hay otro escaneo en curso
-        if GLOBAL_STATE["is_connected"] and GLOBAL_STATE["api"] and not GLOBAL_STATE["is_scanning"]:
+        if (GLOBAL_STATE["settings"].get("auto_scan", False) and 
+            GLOBAL_STATE["is_connected"] and GLOBAL_STATE["api"] and not GLOBAL_STATE["is_scanning"]):
             GLOBAL_STATE["is_scanning"] = True
             GLOBAL_STATE["scan_progress"] = 0
             try:
@@ -569,13 +602,13 @@ def local_background_scan_loop():
                 GLOBAL_STATE["scan_index"] = 0
                 GLOBAL_STATE["scan_total"] = 0
         
-        # Esperar 60 segundos o hasta que se desactive el bucle
-        for _ in range(60):
+        # Esperar 5 segundos entre comprobaciones
+        for _ in range(5):
             if not GLOBAL_STATE["bg_loop_active"] or not GLOBAL_STATE["is_connected"]:
                 break
             time.sleep(1)
             
-    print("Bucle de escaneo en segundo plano finalizado.")
+    print("Servicio en segundo plano finalizado.")
 
 # ─── Endpoints API ────────────────────────────────────────────────────────────
 
