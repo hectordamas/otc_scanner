@@ -1,5 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
 
+icon_path = os.path.abspath('icon.ico')
 
 a = Analysis(
     ['app_launcher.py'],
@@ -32,7 +34,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='icon.ico',
+    icon=icon_path,
 )
 coll = COLLECT(
     exe,

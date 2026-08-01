@@ -85,9 +85,6 @@ class LoginRequest(BaseModel):
 class SettingsUpdateRequest(BaseModel):
     settings: Dict[str, float]
 
-class OpenTelegramRequest(BaseModel):
-    url: Optional[str] = "tg://resolve?domain=telegram"
-
 # ─── Funciones Matemáticas (Copiadas exactamente de otc_scanner.py) ───────────
 
 def calc_ema(prices: List[float], period: int) -> float:
@@ -855,16 +852,6 @@ def get_favicon_ico():
 @app.get("/favicon.png")
 def get_favicon_png():
     return FileResponse(get_static_path("favicon.png"), media_type="image/png")
-
-@app.post("/api/open-telegram")
-def open_telegram(req: Optional[OpenTelegramRequest] = None):
-    import webbrowser
-    target_url = req.url if (req and req.url) else "tg://resolve?domain=telegram"
-    try:
-        webbrowser.open(target_url)
-        return {"status": "ok", "url": target_url}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 @app.on_event("startup")
 def startup_event():
