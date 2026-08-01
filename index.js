@@ -152,6 +152,25 @@ function initDOMEvents() {
   // Guardar y conectar
   document.getElementById("btn-save-settings").addEventListener("click", handleSaveSettings);
 
+  // Toggle visibilidad de contraseña
+  const btnTogglePass = document.getElementById("btn-toggle-pass");
+  if (btnTogglePass) {
+    btnTogglePass.addEventListener("click", () => {
+      const passInput = document.getElementById("input-pass");
+      const iconShow = document.getElementById("eye-icon-show");
+      const iconHide = document.getElementById("eye-icon-hide");
+      if (passInput.type === "password") {
+        passInput.type = "text";
+        iconShow.style.display = "none";
+        iconHide.style.display = "block";
+      } else {
+        passInput.type = "password";
+        iconShow.style.display = "block";
+        iconHide.style.display = "none";
+      }
+    });
+  }
+
   // Cerrar Sesión
   document.getElementById("btn-logout").addEventListener("click", handleLogout);
 

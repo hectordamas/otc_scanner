@@ -1062,6 +1062,40 @@ body {
   border-color: var(--neon-cyan);
 }
 
+.password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.password-wrapper input {
+  width: 100%;
+  padding-right: 40px;
+}
+.btn-toggle-pass {
+  position: absolute;
+  right: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: color 0.2s ease, background-color 0.2s ease;
+  z-index: 2;
+}
+.btn-toggle-pass:hover {
+  color: var(--neon-cyan);
+  background-color: rgba(0, 242, 254, 0.1);
+}
+.icon-eye {
+  width: 18px;
+  height: 18px;
+}
+
 .radio-control-row {
   display: flex;
   flex-direction: column;
