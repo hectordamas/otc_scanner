@@ -477,7 +477,17 @@ async function runCloudScan() {
     const response = await fetch(url);
     
     if (!response.ok) {
-      throw new Error(`Fallo del servidor: ${response.statusText}`);
+      let detail = response.statusText;
+      try {
+        const errJson = await response.json();
+        detail = errJson.detail || errJson.message || detail;
+      } catch (e) {
+        try {
+          const errText = await response.text();
+          if (errText) detail = errText.slice(0, 150);
+        } catch (e2) {}
+      }
+      throw new Error(`HTTP ${response.status}: ${detail || 'No se pudo completar el escaneo'}`);
     }
     
     const reader = response.body.getReader();
