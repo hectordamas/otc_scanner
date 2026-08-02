@@ -152,6 +152,25 @@ function initDOMEvents() {
   // Guardar y conectar
   document.getElementById("btn-save-settings").addEventListener("click", handleSaveSettings);
 
+  // Toggle visibilidad de contraseña
+  const btnTogglePass = document.getElementById("btn-toggle-pass");
+  if (btnTogglePass) {
+    btnTogglePass.addEventListener("click", () => {
+      const passInput = document.getElementById("input-pass");
+      const iconShow = document.getElementById("eye-icon-show");
+      const iconHide = document.getElementById("eye-icon-hide");
+      if (passInput.type === "password") {
+        passInput.type = "text";
+        iconShow.style.display = "none";
+        iconHide.style.display = "block";
+      } else {
+        passInput.type = "password";
+        iconShow.style.display = "block";
+        iconHide.style.display = "none";
+      }
+    });
+  }
+
   // Cerrar Sesión
   document.getElementById("btn-logout").addEventListener("click", handleLogout);
 
@@ -195,6 +214,34 @@ function initDOMEvents() {
       }
       state.selectedPair = null;
       document.querySelectorAll(".pair-row").forEach(r => r.classList.remove("active"));
+    });
+  }
+
+  // Copiar par desde la vista de detalles
+  const detailTitle = document.getElementById("detail-pair-name");
+  if (detailTitle) {
+    detailTitle.addEventListener("click", () => {
+      const pairText = detailTitle.textContent.trim();
+      if (pairText) copyToClipboard(pairText, `Copiado al portapapeles: ${pairText}`);
+    });
+  }
+
+  const btnCopyDetail = document.getElementById("btn-copy-detail-pair");
+  if (btnCopyDetail) {
+    btnCopyDetail.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const pairText = document.getElementById("detail-pair-name").textContent.trim();
+      if (pairText) copyToClipboard(pairText, `Copiado al portapapeles: ${pairText}`);
+    });
+  }
+
+  const btnCopyClean = document.getElementById("btn-copy-detail-clean");
+  if (btnCopyClean) {
+    btnCopyClean.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const rawText = document.getElementById("detail-pair-name").textContent.trim();
+      const cleanText = rawText.replace("-OTC", "");
+      if (cleanText) copyToClipboard(cleanText, `Copiado par limpio: ${cleanText}`);
     });
   }
 }
@@ -477,7 +524,17 @@ async function runCloudScan() {
     const response = await fetch(url);
     
     if (!response.ok) {
-      throw new Error(`Fallo del servidor: ${response.statusText}`);
+      let detail = response.statusText;
+      try {
+        const errJson = await response.json();
+        detail = errJson.detail || errJson.message || detail;
+      } catch (e) {
+        try {
+          const errText = await response.text();
+          if (errText) detail = errText.slice(0, 150);
+        } catch (e2) {}
+      }
+      throw new Error(`HTTP ${response.status}: ${detail || 'No se pudo completar el escaneo'}`);
     }
     
     const reader = response.body.getReader();
@@ -637,13 +694,24 @@ function renderPairsGroup(elementId, list) {
     row.innerHTML = `
       <div class="pair-info-left">
         <span class="pair-dir-arrow ${arrowClass}">${arrow}</span>
-        <span class="pair-symbol">${p.pair.replace("-OTC", "")}</span>
+        <span class="pair-symbol" title="Click o botón para copiar">${p.pair.replace("-OTC", "")}</span>
+        <button class="btn-copy-pair" title="Copiar ${p.pair}">
+          <svg viewBox="0 0 24 24" class="copy-icon"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+        </button>
       </div>
       <div class="pair-info-right">
         <span class="pair-score-badge ${scoreClass}">${Math.round(p.score)}</span>
         <span class="pair-adx-val">${p.adx.toFixed(1)}</span>
       </div>
     `;
+
+    const copyBtn = row.querySelector(".btn-copy-pair");
+    if (copyBtn) {
+      copyBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        copyToClipboard(p.pair, `Copiado: ${p.pair}`);
+      });
+    }
 
     row.addEventListener("click", () => {
       // Remover clase activo anterior
@@ -1751,4 +1819,72 @@ function stopAlarmSoundLoop() {
     clearInterval(timerState.alarmLoopId);
     timerState.alarmLoopId = null;
   }
+}
+
+// ─── Funciones Auxiliares de Portapapeles y Notificaciones (Toasts) ────────
+function copyToClipboard(text, customMessage) {
+  if (!text) return;
+  const message = customMessage || `Copiado: ${text}`;
+  
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast(message);
+    }).catch(() => {
+      fallbackCopyToClipboard(text, message);
+    });
+  } else {
+    fallbackCopyToClipboard(text, message);
+  }
+}
+
+function fallbackCopyToClipboard(text, message) {
+  try {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-9999px";
+    textArea.style.top = "-9999px";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    const successful = document.execCommand("copy");
+    document.body.removeChild(textArea);
+    if (successful) {
+      showToast(message);
+    } else {
+      showToast(`Copia manualmente: ${text}`);
+    }
+  } catch (err) {
+    console.error("Error copiando texto al portapapeles:", err);
+  }
+}
+
+function showToast(message) {
+  let container = document.getElementById("toast-container");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "toast-container";
+    container.className = "toast-container";
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement("div");
+  toast.className = "toast-item";
+  toast.innerHTML = `
+    <svg class="toast-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+    <span>${message}</span>
+  `;
+
+  container.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.classList.add("show");
+  });
+
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 300);
+  }, 2200);
 }

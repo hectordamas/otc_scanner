@@ -207,7 +207,16 @@
                 <svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
               </button>
               <div>
-                <h2 id="detail-pair-name">EURUSD-OTC</h2>
+                <div class="pair-title-copy-wrapper">
+                  <h2 id="detail-pair-name" class="copyable-title" title="Haz clic para copiar el par">EURUSD-OTC</h2>
+                  <button id="btn-copy-detail-pair" class="btn-copy-mini" title="Copiar nombre de par completo (ej: EURUSD-OTC)">
+                    <svg class="icon-copy" viewBox="0 0 24 24"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                    <span>Copiar</span>
+                  </button>
+                  <button id="btn-copy-detail-clean" class="btn-copy-mini btn-copy-clean" title="Copiar nombre limpio sin -OTC (ej: EURUSD)">
+                    <span>sin -OTC</span>
+                  </button>
+                </div>
                 <div class="price-row">
                   <span class="label">PRECIO ACT:</span>
                   <span id="detail-pair-price" class="price-val">1.09243</span>
@@ -508,6 +517,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Contenedor de Toasts / Notificaciones -->
+  <div id="toast-container" class="toast-container"></div>
 
   <script src="index.js"></script>
 </body>

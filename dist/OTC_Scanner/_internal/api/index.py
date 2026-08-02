@@ -612,6 +612,7 @@ def local_background_scan_loop():
 
 # ─── Endpoints API ────────────────────────────────────────────────────────────
 
+@app.post("/login")
 @app.post("/api/login")
 def login(req: LoginRequest, background_tasks: BackgroundTasks):
     """
@@ -658,6 +659,7 @@ def login(req: LoginRequest, background_tasks: BackgroundTasks):
             "message": f"Error de conexión: {str(e)}"
         }
 
+@app.post("/logout")
 @app.post("/api/logout")
 def logout():
     """Cierra la sesión y desconecta del websocket de IQ Option."""
@@ -676,6 +678,7 @@ def logout():
     GLOBAL_STATE["pairs_scanned"] = 0
     return {"success": True, "message": "Sesión cerrada correctamente."}
 
+@app.post("/settings")
 @app.post("/api/settings")
 def update_settings(req: SettingsUpdateRequest):
     """Actualiza la configuración del escáner en caliente."""
@@ -688,11 +691,13 @@ def update_settings(req: SettingsUpdateRequest):
                 GLOBAL_STATE["settings"][k] = float(v)
     return {"success": True, "settings": GLOBAL_STATE["settings"]}
 
+@app.get("/settings")
 @app.get("/api/settings")
 def get_settings():
     """Retorna la configuración actual."""
     return GLOBAL_STATE["settings"]
 
+@app.get("/status")
 @app.get("/api/status")
 def get_status():
     """Retorna el estado de la conexión y del scanner."""
@@ -710,6 +715,7 @@ def get_status():
         "email": GLOBAL_STATE["email"]
     }
 
+@app.get("/results")
 @app.get("/api/results")
 def get_results():
     """
@@ -722,6 +728,7 @@ def get_results():
         "data": GLOBAL_STATE["latest_results"]
     }
 
+@app.post("/scan_now")
 @app.post("/api/scan_now")
 def scan_now(background_tasks: BackgroundTasks):
     """Fuerza un escaneo en segundo plano sin interrumpir ni desconectar el cliente websocket."""
@@ -761,6 +768,7 @@ def scan_now(background_tasks: BackgroundTasks):
     background_tasks.add_task(manual_scan_task)
     return {"success": True, "message": "Escaneo forzado iniciado."}
 
+@app.get("/scan")
 @app.get("/api/scan")
 def get_instant_scan(
     email: Optional[str] = Query(None),

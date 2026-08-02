@@ -5,6 +5,15 @@ import socket
 import threading
 import uvicorn
 import webview
+import ctypes
+
+# Asignar AppUserModelID explícito en Windows para agrupar y anclar la aplicación correctamente en la barra de tareas
+if sys.platform == 'win32':
+    try:
+        myappid = 'otcscanner.app.v1.0'
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+    except Exception:
+        pass
 
 # Asegurar que el directorio raíz del proyecto esté en sys.path
 BASE_DIR = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))

@@ -1062,6 +1062,40 @@ body {
   border-color: var(--neon-cyan);
 }
 
+.password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.password-wrapper input {
+  width: 100%;
+  padding-right: 40px;
+}
+.btn-toggle-pass {
+  position: absolute;
+  right: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: color 0.2s ease, background-color 0.2s ease;
+  z-index: 2;
+}
+.btn-toggle-pass:hover {
+  color: var(--neon-cyan);
+  background-color: rgba(0, 242, 254, 0.1);
+}
+.icon-eye {
+  width: 18px;
+  height: 18px;
+}
+
 .radio-control-row {
   display: flex;
   flex-direction: column;
@@ -1761,4 +1795,141 @@ body {
 @keyframes modalPop {
   from { opacity: 0; transform: scale(0.85); }
   to { opacity: 1; transform: scale(1); }
+}
+
+/* ─── Permitir Selección de Texto en Pares y Precios ─────────────────────── */
+.pair-symbol,
+.copyable-title,
+#detail-pair-name,
+.price-val,
+.monospace {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Botón de Copiar en Filas de Lista de Activos */
+.btn-copy-pair {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.35;
+  transition: all 0.2s ease;
+  margin-left: 2px;
+}
+
+.pair-row:hover .btn-copy-pair,
+.btn-copy-pair:hover {
+  opacity: 1;
+  color: var(--neon-cyan);
+  background: rgba(0, 242, 254, 0.12);
+}
+
+.btn-copy-pair .copy-icon {
+  width: 13px;
+  height: 13px;
+}
+
+/* Encabezado del Detalle y Botones de Copiar */
+.pair-title-copy-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.copyable-title {
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.copyable-title:hover {
+  color: var(--neon-cyan);
+  text-shadow: var(--glow-cyan);
+}
+
+.btn-copy-mini {
+  background: rgba(0, 242, 254, 0.1);
+  border: 1px solid rgba(0, 242, 254, 0.35);
+  color: var(--neon-cyan);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+}
+
+.btn-copy-mini:hover {
+  background: var(--neon-cyan);
+  color: var(--bg-main);
+  box-shadow: var(--glow-cyan);
+}
+
+.btn-copy-mini .icon-copy {
+  width: 14px;
+  height: 14px;
+}
+
+.btn-copy-mini.btn-copy-clean {
+  background: rgba(30, 41, 73, 0.4);
+  border-color: var(--border-color);
+  color: var(--text-muted);
+}
+
+.btn-copy-mini.btn-copy-clean:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: var(--neon-blue);
+  color: var(--text-white);
+}
+
+/* Toast Notifications */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast-item {
+  background: rgba(11, 15, 26, 0.95);
+  border: 1px solid var(--neon-cyan);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), var(--glow-cyan);
+  color: var(--text-white);
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transform: translateY(20px);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+}
+
+.toast-item.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.toast-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--neon-cyan);
+  flex-shrink: 0;
 }
